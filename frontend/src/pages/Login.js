@@ -7,6 +7,24 @@ function normalizeEmail(email) {
   return email.trim().toLowerCase();
 }
 
+const APP_FACTS = [
+  {
+    title: "Real-time floor pulse",
+    description:
+      "Attendance, payments, and customer updates stay in sync so the front desk always sees the latest activity."
+  },
+  {
+    title: "Built for daily gym ops",
+    description:
+      "FitLedger keeps member records, renewals, and collections in one workflow instead of scattered notebooks and chats."
+  },
+  {
+    title: "Owner and admin ready",
+    description:
+      "The app supports role-based access, so each gym can manage its own members while admin users oversee the bigger picture."
+  }
+];
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -24,6 +42,8 @@ export default function Login() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [debugOtp, setDebugOtp] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
 
   const updateField = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -128,7 +148,23 @@ export default function Login() {
   return (
     <div className="auth-layout">
       <section className="auth-hero">
-        <h1>fitLedger</h1>
+        <div className="auth-hero-copy">
+          <span className="eyebrow">Gym operations, simplified</span>
+          <h1>fitLedger</h1>
+          <p>
+            A focused dashboard for managing members, payments, attendance, and day-to-day
+            gym operations without the usual spreadsheet sprawl.
+          </p>
+        </div>
+
+        <div className="auth-feature-list">
+          {APP_FACTS.map((fact) => (
+            <article className="auth-feature" key={fact.title}>
+              <strong>{fact.title}</strong>
+              <span>{fact.description}</span>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="auth-card">
@@ -161,12 +197,21 @@ export default function Login() {
 
             <label className="field">
               <span>Password</span>
-              <input
-                type="password"
-                placeholder="Enter your password"
-                value={form.password}
-                onChange={(event) => updateField("password", event.target.value)}
-              />
+              <div className="field-inline">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={form.password}
+                  onChange={(event) => updateField("password", event.target.value)}
+                />
+                <button
+                  className="button button--ghost field-toggle"
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
             </label>
 
             <div className="auth-actions">
@@ -215,14 +260,23 @@ export default function Login() {
 
                 <label className="field">
                   <span>New password</span>
-                  <input
-                    type="password"
-                    placeholder="Enter a new password"
-                    value={recoveryForm.newPassword}
-                    onChange={(event) =>
-                      updateRecoveryField("newPassword", event.target.value)
-                    }
-                  />
+                  <div className="field-inline">
+                    <input
+                      type={showRecoveryPassword ? "text" : "password"}
+                      placeholder="Enter a new password"
+                      value={recoveryForm.newPassword}
+                      onChange={(event) =>
+                        updateRecoveryField("newPassword", event.target.value)
+                      }
+                    />
+                    <button
+                      className="button button--ghost field-toggle"
+                      type="button"
+                      onClick={() => setShowRecoveryPassword((current) => !current)}
+                    >
+                      {showRecoveryPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
                 </label>
               </>
             ) : null}
