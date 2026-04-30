@@ -20,8 +20,14 @@ const {
 } = require("../utils/otp");
 const { deliverOtp } = require("../utils/otpDelivery");
 
-async function findUserByPhone(store, phone) {
-  return store.findUserByPhone(normalizePhoneNumber(phone));
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN?.trim() || "3d";
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+async function findUserByEmail(store, email) {
+  return store.findUserByEmail(normalizeEmail(email));
 }
 
 router.post("/setup/admin", authLimiter, async (req, res) => {
@@ -81,29 +87,29 @@ router.post("/setup/admin", authLimiter, async (req, res) => {
 });
 
 router.post("/forgot-password/request-otp", authLimiter, async (req, res) => {
-  const identifier = normalizePhoneNumber(req.body.identifier || req.body.phone);
+  const identifier = normalizeEmail(req.body.identifier || req.body.email);
   const store = getStore();
 
   if (!identifier) {
     return res.status(400).json({
-      message: "Provide a valid mobile number to receive the OTP."
+      message: "Provide a valid email address to receive the OTP."
     });
   }
 
-  const user = await findUserByPhone(store, identifier);
+  const user = await findUserByEmail(store, identifier);
 
   if (!user) {
     return res.json({
-      message: "If an account matches that contact, an OTP has been sent.",
-      maskedDestination: `******${identifier.slice(-4)}`
+      message: "If an account matches that email, an OTP has been sent.",
+      maskedDestination: identifier
     });
   }
 
-  const destination = normalizePhoneNumber(user.phone);
+  const destination = normalizeEmail(user.email);
 
   if (!destination) {
     return res.status(400).json({
-      message: "That user does not have a mobile number available for OTP delivery."
+      message: "That user does not have an email address available for OTP delivery."
     });
   }
 
@@ -118,14 +124,14 @@ router.post("/forgot-password/request-otp", authLimiter, async (req, res) => {
     userId: user._id,
     gymId: user.gymId,
     identifier,
-    channel: "phone",
+    channel: "email",
     destination,
     otpHash: hashOtp(otp),
     expiresAt: getOtpExpiryDate()
   });
 
   const delivery = await deliverOtp({
-    channel: "phone",
+    channel: "email",
     destination,
     otp
   });
@@ -138,16 +144,15 @@ router.post("/forgot-password/request-otp", authLimiter, async (req, res) => {
 });
 
 router.post("/forgot-password/reset", authLimiter, async (req, res) => {
-  const identifier = normalizePhoneNumber(req.body.identifier || req.body.phone);
+  const identifier = normalizeEmail(req.body.identifier || req.body.email);
   const otp = String(req.body.otp || "").trim();
   const newPassword = String(req.body.newPassword || "");
   const store = getStore();
 
   if (!identifier || !otp || !newPassword) {
     return res.status(400).json({
-      message:
-        "Provide a valid mobile number, the OTP, and a new password."
-      });
+      message: "Provide a valid email address, the OTP, and a new password."
+    });
   }
 
   const passwordMessage = validatePasswordStrength(newPassword);
@@ -156,7 +161,7 @@ router.post("/forgot-password/reset", authLimiter, async (req, res) => {
     return res.status(400).json({ message: passwordMessage });
   }
 
-  const user = await findUserByPhone(store, identifier);
+  const user = await findUserByEmail(store, identifier);
 
   if (!user) {
     return res.status(400).json({ message: "Invalid OTP or user." });
@@ -221,7 +226,7 @@ router.post("/login", authLimiter, async (req, res) => {
   const token = jwt.sign(
     { gymId: user.gymId, role: user.role, email: user.email },
     process.env.JWT_SECRET,
-    { expiresIn: "7d" }
+    { expiresIn: JWT_EXPIRES_IN }
   );
 
   res.json({
