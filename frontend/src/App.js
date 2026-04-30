@@ -1,4 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AddCustomer from "./pages/AddCustomer";
@@ -8,7 +9,59 @@ import Dashboard from "./pages/Dashboard";
 import GymOwnersAdmin from "./pages/GymOwnersAdmin";
 import Login from "./pages/Login";
 import Payments from "./pages/Payments";
-import { getDefaultRouteForRole, getStoredSession, getStoredToken } from "./services/auth";
+import { disconnectRealtime } from "./services/realtime";
+import {
+  clearSession,
+  getDefaultRouteForRole,
+  getStoredSession,
+  getStoredToken,
+  getTokenExpiryTime
+} from "./services/auth";
+
+function SessionExpiryWatcher() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = getStoredToken();
+    const session = getStoredSession();
+
+    if (!token || !session) {
+      return undefined;
+    }
+
+    const expiryTime = getTokenExpiryTime(token);
+
+    if (!expiryTime) {
+      return undefined;
+    }
+
+    const expireSession = () => {
+      disconnectRealtime();
+      clearSession();
+      navigate("/login", {
+        replace: true,
+        state: {
+          from: location.pathname,
+          reason: "expired"
+        }
+      });
+    };
+
+    const remainingTime = expiryTime - Date.now();
+
+    if (remainingTime <= 0) {
+      expireSession();
+      return undefined;
+    }
+
+    const timer = window.setTimeout(expireSession, remainingTime);
+
+    return () => window.clearTimeout(timer);
+  }, [location.pathname, navigate]);
+
+  return null;
+}
 
 function PublicRoute({ children }) {
   const token = getStoredToken();
@@ -30,6 +83,7 @@ function RootRedirect() {
 export default function App() {
   return (
     <BrowserRouter>
+      <SessionExpiryWatcher />
       <Routes>
         <Route path="/" element={<RootRedirect />} />
         <Route

@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useRef, useState } from "react";
 import API, { getApiError } from "../services/api";
 import { subscribeToRealtime } from "../services/realtime";
 import {
@@ -31,6 +31,7 @@ export default function Attendance() {
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0]);
   const [reloadToken, setReloadToken] = useState(0);
   const deferredQuery = useDeferredValue(query);
+  const skipNextAttendanceReloadRef = useRef(false);
 
   const loadCustomers = async () => {
     setLoading(true);
@@ -73,9 +74,14 @@ export default function Attendance() {
   }, [page, pageSize, deferredQuery, reloadToken]);
 
   useEffect(() => {
-    return subscribeToRealtime("gym:dataChanged", () =>
-      setReloadToken((current) => current + 1)
-    );
+    return subscribeToRealtime("gym:dataChanged", (payload) => {
+      if (payload?.reason === "attendance-recorded" && skipNextAttendanceReloadRef.current) {
+        skipNextAttendanceReloadRef.current = false;
+        return;
+      }
+
+      setReloadToken((current) => current + 1);
+    });
   }, []);
 
   const handleMarkAttendance = async (customerId) => {
@@ -85,8 +91,29 @@ export default function Attendance() {
 
     try {
       const response = await API.post("/customers/attendance", { customerId });
+      const updatedCustomer = response.data;
+      const previousCustomer = customers.find((customer) => customer.customerId === customerId);
+      const wasAttendedToday = isAttendedToday(previousCustomer?.lastAttended);
+      const isNowAttendedToday = isAttendedToday(updatedCustomer.lastAttended);
+
+      skipNextAttendanceReloadRef.current = true;
+      setCustomers((current) =>
+        current.map((customer) =>
+          customer.customerId === customerId
+            ? {
+                ...customer,
+                ...updatedCustomer
+              }
+            : customer
+        )
+      );
+      if (!wasAttendedToday && isNowAttendedToday) {
+        setSummary((current) => ({
+          ...current,
+          attendedToday: Math.min(current.totalCustomers, current.attendedToday + 1)
+        }));
+      }
       setMessage(`Attendance marked for ${response.data.fullName}.`);
-      setReloadToken((current) => current + 1);
     } catch (requestError) {
       setError(getApiError(requestError, "Unable to mark attendance."));
     } finally {

@@ -29,6 +29,8 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = location.state?.from;
+  const expiredMessage =
+    location.state?.reason === "expired" ? "Your session expired. Please sign in again." : "";
   const [form, setForm] = useState({ email: "", password: "" });
   const [recoveryForm, setRecoveryForm] = useState({
     identifier: "",
@@ -102,7 +104,7 @@ export default function Login() {
 
     try {
       const response = await API.post("/forgot-password/request-otp", {
-        identifier: recoveryForm.identifier
+        identifier: normalizeEmail(recoveryForm.identifier)
       });
 
       setOtpRequested(true);
@@ -123,7 +125,7 @@ export default function Login() {
 
     try {
       const response = await API.post("/forgot-password/reset", {
-        identifier: recoveryForm.identifier,
+        identifier: normalizeEmail(recoveryForm.identifier),
         otp: recoveryForm.otp,
         newPassword: recoveryForm.newPassword
       });
@@ -171,11 +173,12 @@ export default function Login() {
         <div>
           <h2>{mode === "login" ? "Sign in" : "Reset password"}</h2>
           {mode === "forgot" ? (
-            <p className="muted-copy">Enter your registered mobile number to get an OTP.</p>
+            <p className="muted-copy">Enter your registered email address to get an OTP.</p>
           ) : null}
         </div>
 
         {message ? <div className="status-banner">{message}</div> : null}
+        {!message && expiredMessage ? <div className="status-banner">{expiredMessage}</div> : null}
         {error ? <div className="status-banner status-banner--error">{error}</div> : null}
         {debugOtp ? (
           <div className="status-banner">
@@ -236,11 +239,11 @@ export default function Login() {
             onSubmit={otpRequested ? handleResetPassword : handleRequestOtp}
           >
             <label className="field">
-              <span>Registered mobile number</span>
+              <span>Registered email address</span>
               <input
-                type="tel"
-                inputMode="numeric"
-                placeholder="9876543210"
+                type="email"
+                inputMode="email"
+                placeholder="owner@example.com"
                 value={recoveryForm.identifier}
                 onChange={(event) => updateRecoveryField("identifier", event.target.value)}
                 disabled={otpRequested}
