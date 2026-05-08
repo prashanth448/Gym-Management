@@ -85,6 +85,9 @@ select {
 }
 
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 999px;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
@@ -137,11 +140,13 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 1rem;
   padding: 1rem 1.1rem;
   border-radius: var(--radius-sm);
   background: rgba(25, 120, 95, 0.12);
   border: 1px solid rgba(25, 120, 95, 0.16);
+  overflow-wrap: anywhere;
 }
 
 .status-banner--error {
@@ -512,6 +517,10 @@ select {
   margin-bottom: 1rem;
 }
 
+.panel-card > .status-banner {
+  margin-bottom: 1rem;
+}
+
 .list-row,
 .info-card__row {
   display: flex;
@@ -528,7 +537,7 @@ select {
 
 .summary-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1rem;
   padding: 1rem 1.2rem;
   border-radius: 22px;
@@ -603,6 +612,12 @@ select {
 .table-member {
   display: grid;
   gap: 0.18rem;
+}
+
+.list-copy {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
 }
 
 .table-actions {
@@ -699,36 +714,6 @@ select {
 
 .info-card {
   align-content: start;
-}
-
-.alert-list {
-  display: grid;
-  gap: 0.9rem;
-}
-
-.alert-card {
-  padding: 1rem;
-  border-radius: 20px;
-  border: 1px solid transparent;
-}
-
-.alert-card h4 {
-  margin: 0.7rem 0 0.3rem;
-}
-
-.alert-card p {
-  margin: 0;
-  color: var(--muted);
-}
-
-.alert-card--warning {
-  background: rgba(243, 170, 47, 0.12);
-  border-color: rgba(243, 170, 47, 0.2);
-}
-
-.alert-card--danger {
-  background: rgba(198, 82, 55, 0.1);
-  border-color: rgba(198, 82, 55, 0.18);
 }
 
 .pressure-grid {
@@ -958,6 +943,19 @@ select {
     padding: 1rem;
   }
 
+  .app-shell__sidebar {
+    gap: 1.2rem;
+    padding: 1rem;
+  }
+
+  .app-shell__nav {
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  }
+
+  .app-shell__sidebar-note {
+    margin-top: 0;
+  }
+
   .auth-hero,
   .auth-card,
   .hero-card,
@@ -968,13 +966,17 @@ select {
   .page-heading,
   .hero-card,
   .app-shell__header,
+  .panel-card__header,
   .filters-row,
   .pagination-toolbar,
   .pagination-row,
   .pagination-actions,
   .attendance-card,
   .list-row,
-  .info-card__row {
+  .info-card__row,
+  .status-banner,
+  .photo-field,
+  .member-cell {
     flex-direction: column;
     align-items: stretch;
   }
@@ -985,8 +987,87 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .field-inline {
+    grid-template-columns: 1fr;
+  }
+
   .field--compact {
     min-width: 0;
+  }
+
+  .field-toggle,
+  .hero-card__actions > .button,
+  .auth-actions > .button,
+  .form-actions > .button,
+  .camera-capture__actions > .button {
+    width: 100%;
+  }
+
+  .customer-photo-preview--large {
+    width: 5.5rem;
+    height: 5.5rem;
+    font-size: 1.6rem;
+  }
+
+  .table-wrap {
+    overflow-x: visible;
+  }
+
+  .data-table {
+    min-width: 0;
+  }
+
+  .data-table thead {
+    display: none;
+  }
+
+  .data-table,
+  .data-table tbody,
+  .data-table tr,
+  .data-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .data-table tbody {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .data-table tr {
+    padding: 1rem;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.58);
+  }
+
+  .data-table td {
+    display: grid;
+    grid-template-columns: minmax(0, 110px) minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: start;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .data-table td:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .data-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .table-member,
+  .table-actions,
+  .list-copy {
+    overflow-wrap: anywhere;
   }
 
   .modal-card {
@@ -1003,4 +1084,5 @@ select {
   .pressure-card strong {
     font-size: 1.9rem;
   }
+
 }

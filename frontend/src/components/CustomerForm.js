@@ -4,9 +4,11 @@ import CustomerPhotoField from "./CustomerPhotoField";
 export const emptyCustomerForm = {
   fullName: "",
   phone: "",
+  email: "",
   age: "",
   plan: PLAN_OPTIONS[0],
   amountPaid: "",
+  dueAmount: "0",
   planStart: "",
   planEnd: "",
   lastAttended: "",
@@ -21,12 +23,17 @@ export function normalizeCustomerForm(customer) {
   return {
     fullName: customer.fullName || "",
     phone: customer.phone || "",
+    email: customer.email || "",
     age: customer.age ? String(customer.age) : "",
     plan: customer.plan || PLAN_OPTIONS[0],
     amountPaid:
       customer.amountPaid === 0 || customer.amountPaid
         ? String(customer.amountPaid)
         : "",
+    dueAmount:
+      customer.dueAmount === 0 || customer.dueAmount
+        ? String(customer.dueAmount)
+        : "0",
     planStart: customer.planStart || "",
     planEnd: customer.planEnd || "",
     lastAttended: customer.lastAttended || "",
@@ -95,6 +102,16 @@ export default function CustomerForm({
             </label>
 
             <label className="field">
+              <span>Email (optional)</span>
+              <input
+                type="email"
+                placeholder="Enter email address"
+                value={form.email}
+                onChange={(event) => updateField("email", event.target.value)}
+              />
+            </label>
+
+            <label className="field">
               <span>Age *</span>
               <input
                 required
@@ -115,6 +132,17 @@ export default function CustomerForm({
                 placeholder="Enter amount paid"
                 value={form.amountPaid}
                 onChange={(event) => updateField("amountPaid", event.target.value)}
+              />
+            </label>
+
+            <label className="field">
+              <span>Due amount</span>
+              <input
+                type="number"
+                min="0"
+                placeholder="Enter due amount"
+                value={form.dueAmount}
+                onChange={(event) => updateField("dueAmount", event.target.value)}
               />
             </label>
           </div>
@@ -183,6 +211,10 @@ export default function CustomerForm({
           <div className="info-card__row">
             <span>Expected end date</span>
             <strong>{formatDisplayDate(previewEndDate)}</strong>
+          </div>
+          <div className="info-card__row">
+            <span>Due amount</span>
+            <strong>Rs. {form.dueAmount || 0}</strong>
           </div>
         </aside>
       </section>

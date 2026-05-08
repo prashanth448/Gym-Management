@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import Notifications from "../components/Notifications";
 import API, { getApiError } from "../services/api";
 import { subscribeToRealtime } from "../services/realtime";
 import {
@@ -10,8 +9,15 @@ import {
 } from "../utils/membership";
 
 export default function Dashboard() {
-  const [customers, setCustomers] = useState([]);
-  const [alerts, setAlerts] = useState([]);
+  const [summary, setSummary] = useState({
+    totalCustomers: 0,
+    activeCount: 0,
+    expiringCount: 0,
+    expiredCount: 0,
+    attendedToday: 0
+  });
+  const [latestMembers, setLatestMembers] = useState([]);
+  const [recentAttendance, setRecentAttendance] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -20,13 +26,18 @@ export default function Dashboard() {
     setError("");
 
     try {
-      const [customersResponse, alertsResponse] = await Promise.all([
-        API.get("/customers"),
-        API.get("/notifications")
-      ]);
-
-      setCustomers(customersResponse.data);
-      setAlerts(alertsResponse.data);
+      const response = await API.get("/customers/dashboard");
+      setSummary(
+        response.data.summary || {
+          totalCustomers: 0,
+          activeCount: 0,
+          expiringCount: 0,
+          expiredCount: 0,
+          attendedToday: 0
+        }
+      );
+      setLatestMembers(response.data.latestMembers || []);
+      setRecentAttendance(response.data.recentAttendance || []);
     } catch (requestError) {
       setError(getApiError(requestError, "Unable to load dashboard data."));
     } finally {
@@ -38,28 +49,6 @@ export default function Dashboard() {
     loadDashboard();
     return subscribeToRealtime("gym:dataChanged", loadDashboard);
   }, []);
-
-  const activeCustomers = customers.filter(
-    (customer) => getMembershipState(customer.planEnd).tone === "success"
-  ).length;
-  const expiringCustomers = customers.filter(
-    (customer) => getMembershipState(customer.planEnd).tone === "warning"
-  ).length;
-  const expiredCustomers = customers.filter(
-    (customer) => getMembershipState(customer.planEnd).tone === "danger"
-  ).length;
-  const attendedToday = customers.filter((customer) =>
-    isAttendedToday(customer.lastAttended)
-  ).length;
-
-  const latestMembers = [...customers]
-    .sort((left, right) => right.customerId - left.customerId)
-    .slice(0, 4);
-
-  const recentAttendance = [...customers]
-    .filter((customer) => customer.lastAttended)
-    .sort((left, right) => right.lastAttended.localeCompare(left.lastAttended))
-    .slice(0, 5);
 
   return (
     <div className="page-stack">
@@ -83,35 +72,23 @@ export default function Dashboard() {
       <section className="metrics-grid">
         <article className="metric-card">
           <span>Total members</span>
-          <strong>{loading ? "..." : customers.length}</strong>
+          <strong>{loading ? "..." : summary.totalCustomers}</strong>
         </article>
         <article className="metric-card">
           <span>Active plans</span>
-          <strong>{loading ? "..." : activeCustomers}</strong>
+          <strong>{loading ? "..." : summary.activeCount}</strong>
         </article>
         <article className="metric-card">
           <span>Expiring soon</span>
-          <strong>{loading ? "..." : expiringCustomers}</strong>
+          <strong>{loading ? "..." : summary.expiringCount}</strong>
         </article>
         <article className="metric-card">
           <span>Checked in today</span>
-          <strong>{loading ? "..." : attendedToday}</strong>
+          <strong>{loading ? "..." : summary.attendedToday}</strong>
         </article>
       </section>
 
       <section className="panel-grid">
-        <article className="panel-card">
-          <div className="panel-card__header">
-            <h3>Renewal alerts</h3>
-            {!loading ? (
-              <span className="badge badge--warning">
-                {alerts.length} needs review
-              </span>
-            ) : null}
-          </div>
-          <Notifications alerts={alerts} loading={loading} error={error} />
-        </article>
-
         <article className="panel-card">
           <div className="panel-card__header">
             <h3>Newest members</h3>
@@ -129,7 +106,7 @@ export default function Dashboard() {
 
                 return (
                   <div key={customer.customerId} className="list-row">
-                    <div>
+                    <div className="list-copy">
                       <strong>{customer.fullName}</strong>
                       <span>
                         #{customer.customerId} • {customer.plan}
@@ -163,7 +140,7 @@ export default function Dashboard() {
             <div className="list-stack">
               {recentAttendance.map((customer) => (
                 <div key={customer.customerId} className="list-row">
-                  <div>
+                  <div className="list-copy">
                     <strong>{customer.fullName}</strong>
                     <span>Last visited {formatDisplayDate(customer.lastAttended)}</span>
                   </div>
@@ -177,7 +154,9 @@ export default function Dashboard() {
             <div className="panel-empty">Attendance will start showing here after check-ins.</div>
           )}
         </article>
+      </section>
 
+      <section className="panel-grid">
         <article className="panel-card">
           <div className="panel-card__header">
             <h3>Renewal pressure</h3>
@@ -185,11 +164,11 @@ export default function Dashboard() {
 
           <div className="pressure-grid">
             <div className="pressure-card pressure-card--warning">
-              <strong>{loading ? "..." : expiringCustomers}</strong>
+              <strong>{loading ? "..." : summary.expiringCount}</strong>
               <span>Expiring in 3 days</span>
             </div>
             <div className="pressure-card pressure-card--danger">
-              <strong>{loading ? "..." : expiredCustomers}</strong>
+              <strong>{loading ? "..." : summary.expiredCount}</strong>
               <span>Already expired</span>
             </div>
           </div>

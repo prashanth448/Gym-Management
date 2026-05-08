@@ -107,13 +107,17 @@ export default function Attendance() {
             : customer
         )
       );
-      if (!wasAttendedToday && isNowAttendedToday) {
+      if (!wasAttendedToday && isNowAttendedToday && updatedCustomer.attendanceRecorded) {
         setSummary((current) => ({
           ...current,
           attendedToday: Math.min(current.totalCustomers, current.attendedToday + 1)
         }));
       }
-      setMessage(`Attendance marked for ${response.data.fullName}.`);
+      setMessage(
+        updatedCustomer.attendanceRecorded
+          ? `Attendance marked for ${updatedCustomer.fullName}.`
+          : `${updatedCustomer.fullName} is already checked in for today.`
+      );
     } catch (requestError) {
       setError(getApiError(requestError, "Unable to mark attendance."));
     } finally {
@@ -259,9 +263,7 @@ export default function Attendance() {
                 className="button button--ghost"
                 type="button"
                 onClick={() =>
-                  setPage((current) =>
-                    pagination.hasNextPage ? current + 1 : current
-                  )
+                  setPage((current) => (pagination.hasNextPage ? current + 1 : current))
                 }
                 disabled={!pagination.hasNextPage}
               >

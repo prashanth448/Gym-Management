@@ -11,6 +11,11 @@ function createInitialForm() {
   };
 }
 
+function buildCustomerCreateMessage(customer, fallbackName) {
+  const fullName = customer?.fullName || fallbackName;
+  return `${fullName} was added successfully.`;
+}
+
 export default function AddCustomer() {
   const navigate = useNavigate();
   const [form, setForm] = useState(createInitialForm);
@@ -46,14 +51,15 @@ export default function AddCustomer() {
     setSaving(true);
 
     try {
-      await API.post("/customers", {
+      const response = await API.post("/customers", {
         ...form,
         age: Number(form.age),
-        amountPaid: Number(form.amountPaid)
+        amountPaid: Number(form.amountPaid),
+        dueAmount: Number(form.dueAmount || 0)
       });
 
       navigate("/customers", {
-        state: { message: `${form.fullName} was added successfully.` }
+        state: { message: buildCustomerCreateMessage(response.data, form.fullName) }
       });
     } catch (requestError) {
       setError(getApiError(requestError, "Unable to add this customer."));

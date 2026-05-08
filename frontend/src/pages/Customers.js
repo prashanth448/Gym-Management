@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { normalizeCustomerForm } from "../components/CustomerForm";
 import API, { getApiError } from "../services/api";
@@ -6,6 +6,7 @@ import { subscribeToRealtime } from "../services/realtime";
 import { getCustomerInitials } from "../utils/customerPhoto";
 import {
   PLAN_OPTIONS,
+  addDaysToDateString,
   formatDisplayDate,
   getMembershipState,
   getPlanEndDate,
@@ -29,13 +30,16 @@ export default function Customers() {
     totalCustomers: 0,
     activeCount: 0,
     expiringCount: 0,
-    expiredCount: 0
+    expiredCount: 0,
+    dueAmountCount: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [flashMessage, setFlashMessage] = useState(location.state?.message || "");
   const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [dueAmountFilter, setDueAmountFilter] = useState("All");
   const [page, setPage] = useState(1);
   const [reloadToken, setReloadToken] = useState(0);
   const [editingCustomer, setEditingCustomer] = useState(null);
@@ -48,9 +52,26 @@ export default function Customers() {
   const [renewForm, setRenewForm] = useState(null);
   const [renewError, setRenewError] = useState("");
   const [savingRenewal, setSavingRenewal] = useState(false);
-  const deferredQuery = useDeferredValue(query);
+  const latestRequestRef = useRef(0);
+
+  useEffect(() => {
+    const nextQuery = query.trim();
+
+    if (!nextQuery) {
+      setAppliedQuery("");
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setAppliedQuery(nextQuery);
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [query]);
 
   const loadCustomers = async () => {
+    const requestId = latestRequestRef.current + 1;
+    latestRequestRef.current = requestId;
     setLoading(true);
     setError("");
 
@@ -59,10 +80,16 @@ export default function Customers() {
         params: {
           page,
           pageSize: PAGE_SIZE,
-          query: deferredQuery.trim(),
-          status: statusFilter
+          query: appliedQuery,
+          status: statusFilter,
+          dueStatus: dueAmountFilter
         }
       });
+
+      if (latestRequestRef.current !== requestId) {
+        return;
+      }
+
       setCustomers(response.data.items || []);
       setPagination(
         response.data.pagination || {
@@ -79,19 +106,26 @@ export default function Customers() {
           totalCustomers: 0,
           activeCount: 0,
           expiringCount: 0,
-          expiredCount: 0
+          expiredCount: 0,
+          dueAmountCount: 0
         }
       );
     } catch (requestError) {
+      if (latestRequestRef.current !== requestId) {
+        return;
+      }
+
       setError(getApiError(requestError, "Unable to load customers."));
     } finally {
-      setLoading(false);
+      if (latestRequestRef.current === requestId) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     loadCustomers();
-  }, [page, deferredQuery, statusFilter, reloadToken]);
+  }, [page, appliedQuery, statusFilter, dueAmountFilter, reloadToken]);
 
   useEffect(() => {
     return subscribeToRealtime("gym:dataChanged", () =>
@@ -129,7 +163,7 @@ export default function Customers() {
     const today = getTodayDateString();
 
     if (customer.planEnd && customer.planEnd >= today) {
-      return customer.planEnd;
+      return addDaysToDateString(customer.planEnd, 1);
     }
 
     return today;
@@ -146,6 +180,10 @@ export default function Customers() {
         customer.amountPaid === 0 || customer.amountPaid
           ? String(customer.amountPaid)
           : "",
+      dueAmount:
+        customer.dueAmount === 0 || customer.dueAmount
+          ? String(customer.dueAmount)
+          : "0",
       planStart,
       planEnd: getPlanEndDate(planStart, plan)
     });
@@ -226,7 +264,8 @@ export default function Customers() {
       const response = await API.put(`/customers/${editingCustomer.customerId}`, {
         ...editForm,
         age: Number(editForm.age),
-        amountPaid: Number(editForm.amountPaid)
+        amountPaid: Number(editForm.amountPaid),
+        dueAmount: Number(editForm.dueAmount || 0)
       });
       setFlashMessage(`${response.data.fullName} was updated successfully.`);
       closeEditModal(true);
@@ -296,7 +335,8 @@ export default function Customers() {
     try {
       const response = await API.post(`/customers/${renewingCustomer.customerId}/renew`, {
         ...renewForm,
-        amountPaid: Number(renewForm.amountPaid)
+        amountPaid: Number(renewForm.amountPaid),
+        dueAmount: Number(renewForm.dueAmount || 0)
       });
       setFlashMessage(`${response.data.fullName} was renewed successfully.`);
       closeRenewModal(true);
@@ -347,6 +387,10 @@ export default function Customers() {
           <strong>{loading ? "..." : summary.expiredCount}</strong>
           <span>Expired</span>
         </div>
+        <div>
+          <strong>{loading ? "..." : summary.dueAmountCount}</strong>
+          <span>With due amount</span>
+        </div>
       </section>
 
       <section className="panel-card">
@@ -354,7 +398,7 @@ export default function Customers() {
           <label className="field">
             <span>Search members</span>
             <input
-              placeholder="Name, phone, or ID"
+              placeholder="Name, phone, email, or ID"
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
@@ -378,6 +422,20 @@ export default function Customers() {
               <option value="Expired">Expired</option>
             </select>
           </label>
+
+          <label className="field field--compact">
+            <span>Due amount</span>
+            <select
+              value={dueAmountFilter}
+              onChange={(event) => {
+                setDueAmountFilter(event.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="All">All</option>
+              <option value="Pending">Pending due only</option>
+            </select>
+          </label>
         </div>
 
         {loading ? (
@@ -391,6 +449,7 @@ export default function Customers() {
                   <th>Member</th>
                   <th>Plan</th>
                   <th>Amount</th>
+                  <th>Due amount</th>
                   <th>Plan ends</th>
                   <th>Last attended</th>
                   <th>Status</th>
@@ -403,8 +462,8 @@ export default function Customers() {
 
                   return (
                     <tr key={customer.customerId}>
-                      <td>#{customer.customerId}</td>
-                      <td>
+                      <td data-label="ID">#{customer.customerId}</td>
+                      <td data-label="Member">
                         <div className="member-cell">
                           <div className="customer-photo-preview customer-photo-preview--small">
                             {customer.photo ? (
@@ -416,21 +475,24 @@ export default function Customers() {
                           <div className="table-member">
                             <strong>{customer.fullName}</strong>
                             <span>
-                              {customer.phone} • Age {customer.age || "N/A"}
+                              {customer.phone}
+                              {customer.email ? ` • ${customer.email}` : ""}
+                              {" • "}Age {customer.age || "N/A"}
                             </span>
                           </div>
                         </div>
                       </td>
-                      <td>{customer.plan}</td>
-                      <td>Rs. {customer.amountPaid}</td>
-                      <td>{formatDisplayDate(customer.planEnd)}</td>
-                      <td>{formatDisplayDate(customer.lastAttended)}</td>
-                      <td>
+                      <td data-label="Plan">{customer.plan}</td>
+                      <td data-label="Amount">Rs. {customer.amountPaid}</td>
+                      <td data-label="Due amount">Rs. {customer.dueAmount || 0}</td>
+                      <td data-label="Plan ends">{formatDisplayDate(customer.planEnd)}</td>
+                      <td data-label="Last attended">{formatDisplayDate(customer.lastAttended)}</td>
+                      <td data-label="Status">
                         <span className={`badge badge--${membership.tone}`}>
                           {membership.label}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Action">
                         <div className="table-actions">
                           <button
                             className="text-link"
@@ -553,6 +615,16 @@ export default function Customers() {
                 </label>
 
                 <label className="field">
+                  <span>Email (optional)</span>
+                  <input
+                    type="email"
+                    placeholder="Enter email address"
+                    value={editForm.email}
+                    onChange={(event) => updateEditField("email", event.target.value)}
+                  />
+                </label>
+
+                <label className="field">
                   <span>Age</span>
                   <input
                     type="number"
@@ -571,6 +643,17 @@ export default function Customers() {
                     placeholder="Enter amount paid"
                     value={editForm.amountPaid}
                     onChange={(event) => updateEditField("amountPaid", event.target.value)}
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Due amount</span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Enter due amount"
+                    value={editForm.dueAmount}
+                    onChange={(event) => updateEditField("dueAmount", event.target.value)}
                   />
                 </label>
               </div>
@@ -644,6 +727,10 @@ export default function Customers() {
                 <div className="info-card__row">
                   <span>Plan end</span>
                   <strong>{formatDisplayDate(editForm.planEnd)}</strong>
+                </div>
+                <div className="info-card__row">
+                  <span>Due amount</span>
+                  <strong>Rs. {editForm.dueAmount || 0}</strong>
                 </div>
                 <div className="info-card__row">
                   <span>Last attended</span>
@@ -805,6 +892,17 @@ export default function Customers() {
                 </label>
 
                 <label className="field">
+                  <span>Due amount</span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Enter due amount"
+                    value={renewForm.dueAmount}
+                    onChange={(event) => updateRenewField("dueAmount", event.target.value)}
+                  />
+                </label>
+
+                <label className="field">
                   <span>Plan start</span>
                   <input
                     type="date"
@@ -838,6 +936,10 @@ export default function Customers() {
                 <div className="info-card__row">
                   <span>Next plan ends</span>
                   <strong>{formatDisplayDate(renewForm.planEnd)}</strong>
+                </div>
+                <div className="info-card__row">
+                  <span>Due amount</span>
+                  <strong>Rs. {renewForm.dueAmount || 0}</strong>
                 </div>
                 <div className="info-card__row">
                   <span>Suggested end date</span>

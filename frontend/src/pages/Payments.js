@@ -279,18 +279,18 @@ export default function Payments() {
               <tbody>
                 {paymentEntries.map((payment) => (
                   <tr key={payment.entryId}>
-                    <td>#{payment.customerId}</td>
-                    <td>
+                    <td data-label="ID">#{payment.customerId}</td>
+                    <td data-label="Member">
                       <div className="table-member">
                         <strong>{payment.fullName}</strong>
                         <span>{payment.phone}</span>
                       </div>
                     </td>
-                    <td>{payment.plan}</td>
-                    <td>{formatDisplayDate(payment.planStart)}</td>
-                    <td>{formatDisplayDate(payment.recordedOn)}</td>
-                    <td>{formatDisplayDate(payment.planEnd)}</td>
-                    <td>{formatCurrency(payment.amountPaid)}</td>
+                    <td data-label="Plan">{payment.plan}</td>
+                    <td data-label="Plan starts">{formatDisplayDate(payment.planStart)}</td>
+                    <td data-label="Recorded on">{formatDisplayDate(payment.recordedOn)}</td>
+                    <td data-label="Plan ends">{formatDisplayDate(payment.planEnd)}</td>
+                    <td data-label="Amount">{formatCurrency(payment.amountPaid)}</td>
                   </tr>
                 ))}
               </tbody>

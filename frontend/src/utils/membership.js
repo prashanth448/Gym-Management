@@ -28,6 +28,44 @@ function formatDateOnly(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+export function addDaysToDateString(value, days) {
+  const date = parseDateOnly(value);
+
+  if (!date || !Number.isFinite(days)) {
+    return "";
+  }
+
+  date.setDate(date.getDate() + Math.trunc(days));
+  return formatDateOnly(date);
+}
+
+function getDaysInMonth(year, monthIndex) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+function addMonthsClamped(date, months) {
+  const targetMonthIndex = date.getMonth() + months;
+  const targetYear = date.getFullYear() + Math.floor(targetMonthIndex / 12);
+  const normalizedMonthIndex = ((targetMonthIndex % 12) + 12) % 12;
+  const targetDay = Math.min(
+    date.getDate(),
+    getDaysInMonth(targetYear, normalizedMonthIndex)
+  );
+
+  date.setFullYear(targetYear, normalizedMonthIndex, targetDay);
+}
+
+function addYearsClamped(date, years) {
+  const targetYear = date.getFullYear() + years;
+  const targetMonthIndex = date.getMonth();
+  const targetDay = Math.min(
+    date.getDate(),
+    getDaysInMonth(targetYear, targetMonthIndex)
+  );
+
+  date.setFullYear(targetYear, targetMonthIndex, targetDay);
+}
+
 export function getTodayDateString() {
   return formatDateOnly(new Date());
 }
@@ -40,20 +78,22 @@ export function getPlanEndDate(startDate, plan) {
   }
 
   if (plan === "1 Month") {
-    date.setMonth(date.getMonth() + 1);
+    addMonthsClamped(date, 1);
   }
 
   if (plan === "3 Months") {
-    date.setMonth(date.getMonth() + 3);
+    addMonthsClamped(date, 3);
   }
 
   if (plan === "6 Months") {
-    date.setMonth(date.getMonth() + 6);
+    addMonthsClamped(date, 6);
   }
 
   if (plan === "1 Year") {
-    date.setFullYear(date.getFullYear() + 1);
+    addYearsClamped(date, 1);
   }
+
+  date.setDate(date.getDate() - 1);
 
   return formatDateOnly(date);
 }
