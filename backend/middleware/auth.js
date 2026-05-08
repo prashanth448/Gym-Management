@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const { getStore } = require("../data/store");
+const { isTokenStaleForUser } = require("../utils/session");
 
 function extractToken(authorizationHeader) {
   if (typeof authorizationHeader !== "string" || !authorizationHeader.trim()) {
@@ -24,6 +25,10 @@ module.exports = async (req, res, next) => {
 
     if (!user) {
       return res.status(401).json({ message: "User account no longer exists." });
+    }
+
+    if (isTokenStaleForUser(decoded, user)) {
+      return res.status(401).json({ message: "Session expired. Please sign in again." });
     }
 
     if (user.role === "owner" && user.status !== "Active") {

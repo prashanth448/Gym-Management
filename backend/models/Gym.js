@@ -12,6 +12,7 @@ const schema = new mongoose.Schema(
     password: { type: String, required: true },
     phone: String,
     city: String,
+    passwordUpdatedAt: Date,
     status: {
       type: String,
       enum: ["Active", "Pending", "Suspended"],

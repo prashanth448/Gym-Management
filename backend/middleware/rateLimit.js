@@ -41,7 +41,16 @@ const authLimiter = createLimiter({
   message: "Too many authentication attempts. Please wait a few minutes and try again."
 });
 
+const passwordResetRequestLimiter = createLimiter({
+  windowEnvKey: "PASSWORD_RESET_REQUEST_WINDOW_MINUTES",
+  windowMinutes: 15,
+  maxEnvKey: "PASSWORD_RESET_REQUEST_MAX_ATTEMPTS",
+  maxRequests: 3,
+  message: "Too many password reset requests. Please wait a few minutes and try again."
+});
+
 module.exports = {
   apiLimiter,
-  authLimiter
+  authLimiter,
+  passwordResetRequestLimiter
 };

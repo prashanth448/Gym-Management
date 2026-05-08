@@ -32,6 +32,17 @@ function getTodayDate() {
   return formatDate(new Date());
 }
 
+function addDaysToDateString(value, days) {
+  const date = parseDateOnly(value);
+
+  if (!date || !Number.isFinite(days)) {
+    return "";
+  }
+
+  date.setDate(date.getDate() + Math.trunc(days));
+  return formatDate(date);
+}
+
 function diffInDays(fromValue, toValue) {
   const fromDate = parseDateOnly(fromValue);
   const toDate = parseDateOnly(toValue);
@@ -44,6 +55,7 @@ function diffInDays(fromValue, toValue) {
 }
 
 module.exports = {
+  addDaysToDateString,
   diffInDays,
   formatDate,
   getTodayDate,

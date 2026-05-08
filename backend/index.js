@@ -9,6 +9,7 @@ const { configureStore, getStoreMode } = require("./data/store");
 const requestLogger = require("./middleware/requestLogger");
 const { apiLimiter } = require("./middleware/rateLimit");
 const { initRealtime } = require("./realtime");
+const { startWhatsAppReminderScheduler } = require("./services/whatsappReminderScheduler");
 
 function getAllowedOrigins() {
   const configuredOrigins = (process.env.CLIENT_ORIGIN || "")
@@ -32,6 +33,7 @@ async function startServer() {
   };
 
   await configureStore({ mode: mongoMode });
+  startWhatsAppReminderScheduler();
 
   app.set("trust proxy", process.env.TRUST_PROXY?.trim() || 1);
 
@@ -49,7 +51,6 @@ async function startServer() {
   app.use("/api", require("./routes/auth"));
   app.use("/api/customers", require("./routes/customers"));
   app.use("/api/payments", require("./routes/payments"));
-  app.use("/api/notifications", require("./routes/notifications"));
   app.use("/api/admin", require("./routes/admin"));
 
   const server = http.createServer(app);

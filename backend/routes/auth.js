@@ -2,7 +2,11 @@ const router = require("express").Router();
 const jwt = require("jsonwebtoken");
 const PasswordResetOtp = require("../models/PasswordResetOtp");
 const { getStore } = require("../data/store");
-const { authLimiter } = require("../middleware/rateLimit");
+const {
+  authLimiter,
+  passwordResetRequestLimiter
+} = require("../middleware/rateLimit");
+const { disconnectGymRealtime } = require("../realtime");
 const {
   hashPassword,
   isPasswordHash,
@@ -86,7 +90,7 @@ router.post("/setup/admin", authLimiter, async (req, res) => {
   });
 });
 
-router.post("/forgot-password/request-otp", authLimiter, async (req, res) => {
+router.post("/forgot-password/request-otp", passwordResetRequestLimiter, async (req, res) => {
   const identifier = normalizeEmail(req.body.identifier || req.body.email);
   const store = getStore();
 
@@ -120,7 +124,7 @@ router.post("/forgot-password/request-otp", authLimiter, async (req, res) => {
     usedAt: null
   });
 
-  await PasswordResetOtp.create({
+  const otpRecord = await PasswordResetOtp.create({
     userId: user._id,
     gymId: user.gymId,
     identifier,
@@ -130,11 +134,21 @@ router.post("/forgot-password/request-otp", authLimiter, async (req, res) => {
     expiresAt: getOtpExpiryDate()
   });
 
-  const delivery = await deliverOtp({
-    channel: "email",
-    destination,
-    otp
-  });
+  let delivery;
+
+  try {
+    delivery = await deliverOtp({
+      channel: "email",
+      destination,
+      otp
+    });
+  } catch (error) {
+    await PasswordResetOtp.deleteOne({ _id: otpRecord._id });
+    console.error(`Unable to deliver password reset OTP for ${user.gymId}: ${error.message}`);
+    return res.status(503).json({
+      message: "Unable to send the OTP right now. Please try again in a few minutes."
+    });
+  }
 
   res.json({
     message: `OTP sent to ${delivery.maskedDestination}.`,
@@ -196,6 +210,7 @@ router.post("/forgot-password/reset", authLimiter, async (req, res) => {
     userId: user._id,
     _id: { $ne: otpRecord._id }
   });
+  disconnectGymRealtime(user.gymId);
 
   res.json({ message: "Password updated successfully. You can now sign in." });
 });

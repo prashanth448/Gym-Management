@@ -1,6 +1,7 @@
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
 const { getStore } = require("./data/store");
+const { isTokenStaleForUser } = require("./utils/session");
 
 let io = null;
 
@@ -43,6 +44,10 @@ async function resolveSocketUser(socket) {
 
   if (!user) {
     throw new Error("User account no longer exists.");
+  }
+
+  if (isTokenStaleForUser(decoded, user)) {
+    throw new Error("Session expired. Please sign in again.");
   }
 
   if (user.role === "owner" && user.status !== "Active") {

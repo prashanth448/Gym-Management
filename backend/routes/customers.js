@@ -20,6 +20,14 @@ function parseOptionalNumber(value) {
   return value === undefined || value === null || value === "" ? undefined : Number(value);
 }
 
+function normalizeOptionalEmail(value) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
 function validateCustomerPayload(payload, options = {}) {
   const { partial = false } = options;
   const requiredFields = ["fullName", "phone", "age", "plan", "amountPaid", "planStart"];
@@ -43,6 +51,10 @@ function validateCustomerPayload(payload, options = {}) {
     return "Enter a valid mobile number with 10 to 15 digits.";
   }
 
+  if (payload.email !== undefined && payload.email !== "" && !isValidEmail(payload.email)) {
+    return "Enter a valid email address.";
+  }
+
   if (payload.plan !== undefined && !isValidPlan(payload.plan)) {
     return "Choose a valid membership plan.";
   }
@@ -56,6 +68,12 @@ function validateCustomerPayload(payload, options = {}) {
   if (payload.amountPaid !== undefined) {
     if (!Number.isFinite(payload.amountPaid) || payload.amountPaid < 0) {
       return "Amount paid must be 0 or more.";
+    }
+  }
+
+  if (payload.dueAmount !== undefined) {
+    if (!Number.isFinite(payload.dueAmount) || payload.dueAmount < 0) {
+      return "Due amount must be 0 or more.";
     }
   }
 
@@ -111,6 +129,12 @@ function validateRenewalPayload(payload) {
     }
   }
 
+  if (payload.dueAmount !== undefined) {
+    if (!Number.isFinite(payload.dueAmount) || payload.dueAmount < 0) {
+      return "Due amount must be 0 or more.";
+    }
+  }
+
   if (payload.planStart !== undefined && payload.planStart !== "" && !parseDateOnly(payload.planStart)) {
     return "Plan start must be a valid date.";
   }
@@ -150,13 +174,15 @@ router.get("/", auth, async (req, res) => {
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 10));
     const query = String(req.query.query || "").trim();
     const status = String(req.query.status || "All").trim();
+    const dueStatus = String(req.query.dueStatus || "All").trim();
 
     const [directory, summary] = await Promise.all([
       getStore().listCustomersPageByGymId(req.user.gymId, {
         page,
         pageSize,
         query,
-        status
+        status,
+        dueStatus
       }),
       getStore().getCustomerDirectorySummary(req.user.gymId)
     ]);
@@ -197,6 +223,15 @@ router.get("/attendance", auth, async (req, res) => {
   });
 });
 
+router.get("/dashboard", auth, async (req, res) => {
+  if (!requireOwner(req, res)) {
+    return;
+  }
+
+  const snapshot = await getStore().getDashboardSnapshot(req.user.gymId);
+  res.json(snapshot);
+});
+
 router.get("/:customerId", auth, async (req, res) => {
   if (!requireOwner(req, res)) {
     return;
@@ -222,9 +257,11 @@ router.post("/", auth, async (req, res) => {
   const payload = {
     fullName: req.body.fullName?.trim(),
     phone: normalizePhoneNumber(req.body.phone),
+    email: normalizeOptionalEmail(req.body.email),
     age: parseOptionalNumber(req.body.age),
     plan: req.body.plan,
     amountPaid: parseOptionalNumber(req.body.amountPaid),
+    dueAmount: parseOptionalNumber(req.body.dueAmount) ?? 0,
     planStart: req.body.planStart?.trim(),
     planEnd: req.body.planEnd?.trim(),
     recordedOn: req.body.recordedOn?.trim(),
@@ -243,10 +280,10 @@ router.post("/", auth, async (req, res) => {
     });
   }
 
-  const c = await getStore().createCustomer(req.user.gymId, payload);
+  const customer = await getStore().createCustomer(req.user.gymId, payload);
   emitAdminDataChanged("customer-created", { gymId: req.user.gymId });
   emitGymDataChanged(req.user.gymId, "customer-created");
-  res.status(201).json(c);
+  res.status(201).json(customer);
 });
 
 router.put("/:customerId", auth, async (req, res) => {
@@ -258,9 +295,11 @@ router.put("/:customerId", auth, async (req, res) => {
     const payload = {
       fullName: req.body.fullName?.trim(),
       phone: normalizePhoneNumber(req.body.phone),
+      email: normalizeOptionalEmail(req.body.email),
       age: parseOptionalNumber(req.body.age),
       plan: req.body.plan,
       amountPaid: parseOptionalNumber(req.body.amountPaid),
+      dueAmount: parseOptionalNumber(req.body.dueAmount) ?? 0,
       planStart: req.body.planStart?.trim(),
       planEnd: req.body.planEnd?.trim(),
       recordedOn: req.body.recordedOn?.trim(),
@@ -341,6 +380,7 @@ router.post("/:customerId/renew", auth, async (req, res) => {
     const payload = {
       plan: req.body.plan,
       amountPaid: parseOptionalNumber(req.body.amountPaid),
+      dueAmount: parseOptionalNumber(req.body.dueAmount) ?? 0,
       planStart: req.body.planStart?.trim(),
       planEnd: req.body.planEnd?.trim(),
       recordedOn: req.body.recordedOn?.trim()
@@ -381,15 +421,19 @@ router.post("/attendance", auth, async (req, res) => {
     return res.status(400).json({ message: "A valid customer ID is required." });
   }
 
-  const c = await getStore().recordAttendance(
-    req.user.gymId,
-    customerId
-  );
+  const result = await getStore().recordAttendance(req.user.gymId, customerId, {
+    source: "manual"
+  });
 
-  if (!c) return res.status(404).json({ message: "Not found" });
+  if (!result) return res.status(404).json({ message: "Not found" });
 
-  emitGymDataChanged(req.user.gymId, "attendance-recorded");
-  res.json(c);
+  if (result.attendanceRecorded) {
+    emitGymDataChanged(req.user.gymId, "attendance-recorded");
+  }
+  res.json({
+    ...result.customer,
+    attendanceRecorded: result.attendanceRecorded
+  });
 });
 
 module.exports = router;

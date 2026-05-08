@@ -7,6 +7,33 @@ function isValidPlan(plan) {
   return PLAN_OPTIONS.includes(plan);
 }
 
+function getDaysInMonth(year, monthIndex) {
+  return new Date(year, monthIndex + 1, 0).getDate();
+}
+
+function addMonthsClamped(date, months) {
+  const targetMonthIndex = date.getMonth() + months;
+  const targetYear = date.getFullYear() + Math.floor(targetMonthIndex / 12);
+  const normalizedMonthIndex = ((targetMonthIndex % 12) + 12) % 12;
+  const targetDay = Math.min(
+    date.getDate(),
+    getDaysInMonth(targetYear, normalizedMonthIndex)
+  );
+
+  date.setFullYear(targetYear, normalizedMonthIndex, targetDay);
+}
+
+function addYearsClamped(date, years) {
+  const targetYear = date.getFullYear() + years;
+  const targetMonthIndex = date.getMonth();
+  const targetDay = Math.min(
+    date.getDate(),
+    getDaysInMonth(targetYear, targetMonthIndex)
+  );
+
+  date.setFullYear(targetYear, targetMonthIndex, targetDay);
+}
+
 function getPlanEnd(start, plan) {
   const d = parseDateOnly(start);
 
@@ -14,10 +41,11 @@ function getPlanEnd(start, plan) {
     return "";
   }
 
-  if (plan === "1 Month") d.setMonth(d.getMonth() + 1);
-  if (plan === "3 Months") d.setMonth(d.getMonth() + 3);
-  if (plan === "6 Months") d.setMonth(d.getMonth() + 6);
-  if (plan === "1 Year") d.setFullYear(d.getFullYear() + 1);
+  if (plan === "1 Month") addMonthsClamped(d, 1);
+  if (plan === "3 Months") addMonthsClamped(d, 3);
+  if (plan === "6 Months") addMonthsClamped(d, 6);
+  if (plan === "1 Year") addYearsClamped(d, 1);
+  d.setDate(d.getDate() - 1);
 
   return formatDate(d);
 }
