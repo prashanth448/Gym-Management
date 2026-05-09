@@ -655,6 +655,7 @@ const mongoStore = {
       activeCount: summary?.activeCount || 0,
       expiringCount: summary?.expiringCount || 0,
       expiredCount: summary?.expiredCount || 0,
+      attendedToday: summary?.attendedToday || 0,
       dueAmountCount: summary?.dueAmountCount || 0,
       totalDueAmount: summary?.totalDueAmount || 0
     };

@@ -5,6 +5,10 @@ const { isTokenStaleForUser } = require("./utils/session");
 
 let io = null;
 
+function isProductionEnv() {
+  return String(process.env.NODE_ENV || "").trim().toLowerCase() === "production";
+}
+
 function extractSocketToken(socket) {
   const authToken =
     typeof socket.handshake.auth?.token === "string"
@@ -28,6 +32,10 @@ function getAllowedOrigins() {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+
+  if (isProductionEnv() && !configuredOrigins.length) {
+    throw new Error("CLIENT_ORIGIN must be configured in production.");
+  }
 
   return configuredOrigins.length ? configuredOrigins : true;
 }

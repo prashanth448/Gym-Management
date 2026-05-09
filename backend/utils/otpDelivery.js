@@ -1,18 +1,27 @@
 const { maskDestination } = require("./otp");
 
+function isProductionEnv() {
+  return String(process.env.NODE_ENV || "").trim().toLowerCase() === "production";
+}
+
 async function sendEmailOtp(destination, otp) {
   const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.RESEND_FROM_EMAIL;
+  const rawFromEmail = process.env.RESEND_FROM_EMAIL?.trim();
 
-  if (!apiKey || !fromEmail) {
+  if (!apiKey || !rawFromEmail) {
     return null;
   }
+
+  const fromEmail = rawFromEmail.includes("<")
+    ? rawFromEmail
+    : `FitLedger <${rawFromEmail}>`;
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "User-Agent": "fitLedger-password-reset"
     },
     body: JSON.stringify({
       from: fromEmail,
@@ -63,11 +72,35 @@ async function sendPhoneOtp(destination, otp) {
   return { provider: "twilio" };
 }
 
+function buildConsoleOtpResult(channel, destination, otp) {
+  console.log(`[OTP:${channel}] Password reset OTP for ${destination}: ${otp}`);
+
+  return {
+    provider: "console",
+    maskedDestination: maskDestination(channel, destination),
+    debugOtp: otp
+  };
+}
+
 async function deliverOtp({ channel, destination, otp }) {
-  const providerResult =
-    channel === "email"
-      ? await sendEmailOtp(destination, otp)
-      : await sendPhoneOtp(destination, otp);
+  let providerResult = null;
+
+  try {
+    providerResult =
+      channel === "email"
+        ? await sendEmailOtp(destination, otp)
+        : await sendPhoneOtp(destination, otp);
+  } catch (error) {
+    if (isProductionEnv()) {
+      throw error;
+    }
+
+    console.warn(
+      `[OTP:${channel}] Provider delivery failed for ${destination}. Falling back to console OTP in non-production. ${error.message}`
+    );
+
+    return buildConsoleOtpResult(channel, destination, otp);
+  }
 
   if (providerResult) {
     return {
@@ -76,19 +109,13 @@ async function deliverOtp({ channel, destination, otp }) {
     };
   }
 
-  if (process.env.NODE_ENV === "production") {
+  if (isProductionEnv()) {
     throw new Error(
       `No ${channel.toUpperCase()} OTP provider is configured for production delivery.`
     );
   }
 
-  console.log(`[OTP:${channel}] Password reset OTP for ${destination}: ${otp}`);
-
-  return {
-    provider: "console",
-    maskedDestination: maskDestination(channel, destination),
-    debugOtp: otp
-  };
+  return buildConsoleOtpResult(channel, destination, otp);
 }
 
 module.exports = {

@@ -11,11 +11,19 @@ const { apiLimiter } = require("./middleware/rateLimit");
 const { initRealtime } = require("./realtime");
 const { startWhatsAppReminderScheduler } = require("./services/whatsappReminderScheduler");
 
+function isProductionEnv() {
+  return String(process.env.NODE_ENV || "").trim().toLowerCase() === "production";
+}
+
 function getAllowedOrigins() {
   const configuredOrigins = (process.env.CLIENT_ORIGIN || "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+
+  if (isProductionEnv() && !configuredOrigins.length) {
+    throw new Error("CLIENT_ORIGIN must be configured in production.");
+  }
 
   return configuredOrigins.length ? configuredOrigins : true;
 }

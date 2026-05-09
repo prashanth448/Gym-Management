@@ -5,6 +5,10 @@ const { disconnectGymRealtime, emitAdminDataChanged } = require("../realtime");
 const { validatePasswordStrength } = require("../utils/passwords");
 const { isValidPhoneNumber, normalizePhoneNumber } = require("../utils/otp");
 
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
 function requireAdmin(req, res) {
   if (req.user.role !== "admin") {
     res.status(403).json({ message: "Admin access required." });
@@ -35,6 +39,10 @@ async function validateGymOwnerPayload(payload, currentGymId = null) {
 
   if (await store.isGymOwnerEmailTaken(payload.email.toLowerCase(), currentGymId)) {
     return "That email address is already assigned to another gym owner.";
+  }
+
+  if (!isValidEmail(payload.email)) {
+    return "Enter a valid email address.";
   }
 
   if (!isValidPhoneNumber(payload.phone)) {

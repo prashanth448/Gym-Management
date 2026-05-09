@@ -3,7 +3,7 @@ const router = require("express").Router();
 const auth = require("../middleware/auth");
 const { getStore } = require("../data/store");
 const { emitAdminDataChanged, emitGymDataChanged } = require("../realtime");
-const { parseDateOnly } = require("../utils/date");
+const { getTodayDate, parseDateOnly } = require("../utils/date");
 const { getPlanEnd, isValidPlan } = require("../utils/plan");
 const { isValidPhoneNumber, normalizePhoneNumber } = require("../utils/otp");
 
@@ -91,6 +91,14 @@ function validateCustomerPayload(payload, options = {}) {
     !parseDateOnly(payload.lastAttended)
   ) {
     return "Last attended must be a valid date.";
+  }
+
+  if (
+    payload.lastAttended !== undefined &&
+    payload.lastAttended !== "" &&
+    payload.lastAttended > getTodayDate()
+  ) {
+    return "Last attended cannot be a future date.";
   }
 
   if (payload.recordedOn !== undefined && payload.recordedOn !== "" && !parseDateOnly(payload.recordedOn)) {

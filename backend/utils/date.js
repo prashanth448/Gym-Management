@@ -1,11 +1,23 @@
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_APP_TIMEZONE = "Asia/Kolkata";
+
+function getAppTimeZone() {
+  return String(process.env.APP_TIMEZONE || DEFAULT_APP_TIMEZONE).trim() || DEFAULT_APP_TIMEZONE;
+}
 
 function pad(value) {
   return String(value).padStart(2, "0");
 }
 
 function formatDate(date = new Date()) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: getAppTimeZone(),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+
+  return formatter.format(date);
 }
 
 function parseDateOnly(value) {
@@ -58,6 +70,7 @@ module.exports = {
   addDaysToDateString,
   diffInDays,
   formatDate,
+  getAppTimeZone,
   getTodayDate,
   parseDateOnly
 };
