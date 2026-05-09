@@ -472,14 +472,15 @@ select {
 }
 
 .metrics-grid,
-.panel-grid,
-.pressure-grid {
+.panel-grid {
   display: grid;
   gap: 1rem;
 }
 
 .metrics-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .metric-card {
@@ -497,8 +498,7 @@ select {
 }
 
 .metric-card strong,
-.summary-strip strong,
-.pressure-card strong {
+.summary-strip strong {
   display: block;
   margin: 0.4rem 0;
   font-family: "Space Grotesk", sans-serif;
@@ -714,27 +714,6 @@ select {
 
 .info-card {
   align-content: start;
-}
-
-.pressure-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-bottom: 1rem;
-}
-
-.pressure-card {
-  border-radius: 22px;
-  padding: 1.2rem;
-  border: 1px solid transparent;
-}
-
-.pressure-card--warning {
-  background: rgba(243, 170, 47, 0.12);
-  border-color: rgba(243, 170, 47, 0.2);
-}
-
-.pressure-card--danger {
-  background: rgba(198, 82, 55, 0.1);
-  border-color: rgba(198, 82, 55, 0.18);
 }
 
 .payments-month-list,
@@ -982,7 +961,6 @@ select {
   }
 
   .form-grid,
-  .pressure-grid,
   .modal-summary {
     grid-template-columns: 1fr;
   }
@@ -1080,8 +1058,7 @@ select {
   }
 
   .metric-card strong,
-  .summary-strip strong,
-  .pressure-card strong {
+  .summary-strip strong {
     font-size: 1.9rem;
   }
 

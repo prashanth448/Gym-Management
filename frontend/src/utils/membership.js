@@ -1,4 +1,9 @@
 export const PLAN_OPTIONS = ["1 Month", "3 Months", "6 Months", "1 Year"];
+const DEFAULT_APP_TIMEZONE = "Asia/Kolkata";
+
+function getAppTimeZone() {
+  return process.env.REACT_APP_TIMEZONE || DEFAULT_APP_TIMEZONE;
+}
 
 function pad(value) {
   return String(value).padStart(2, "0");
@@ -67,7 +72,12 @@ function addYearsClamped(date, years) {
 }
 
 export function getTodayDateString() {
-  return formatDateOnly(new Date());
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: getAppTimeZone(),
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
 }
 
 export function getPlanEndDate(startDate, plan) {

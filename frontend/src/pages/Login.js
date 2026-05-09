@@ -180,7 +180,7 @@ export default function Login() {
         {message ? <div className="status-banner">{message}</div> : null}
         {!message && expiredMessage ? <div className="status-banner">{expiredMessage}</div> : null}
         {error ? <div className="status-banner status-banner--error">{error}</div> : null}
-        {debugOtp ? (
+        {process.env.NODE_ENV !== "production" && debugOtp ? (
           <div className="status-banner">
             Development OTP preview: <strong>{debugOtp}</strong>
           </div>

@@ -83,6 +83,10 @@ export default function Dashboard() {
           <strong>{loading ? "..." : summary.expiringCount}</strong>
         </article>
         <article className="metric-card">
+          <span>Expired</span>
+          <strong>{loading ? "..." : summary.expiredCount}</strong>
+        </article>
+        <article className="metric-card">
           <span>Checked in today</span>
           <strong>{loading ? "..." : summary.attendedToday}</strong>
         </article>
@@ -123,9 +127,7 @@ export default function Dashboard() {
             <div className="panel-empty">No customers yet. Add your first member to begin.</div>
           )}
         </article>
-      </section>
 
-      <section className="panel-grid">
         <article className="panel-card">
           <div className="panel-card__header">
             <h3>Recent attendance</h3>
@@ -153,25 +155,6 @@ export default function Dashboard() {
           ) : (
             <div className="panel-empty">Attendance will start showing here after check-ins.</div>
           )}
-        </article>
-      </section>
-
-      <section className="panel-grid">
-        <article className="panel-card">
-          <div className="panel-card__header">
-            <h3>Renewal pressure</h3>
-          </div>
-
-          <div className="pressure-grid">
-            <div className="pressure-card pressure-card--warning">
-              <strong>{loading ? "..." : summary.expiringCount}</strong>
-              <span>Expiring in 3 days</span>
-            </div>
-            <div className="pressure-card pressure-card--danger">
-              <strong>{loading ? "..." : summary.expiredCount}</strong>
-              <span>Already expired</span>
-            </div>
-          </div>
         </article>
       </section>
     </div>
