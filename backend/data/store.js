@@ -578,7 +578,7 @@ const mongoStore = {
   },
 
   async listCustomersByGymId(gymId) {
-    const customers = await Customer.find({ gymId }).sort({ customerId: 1 }).lean();
+    const customers = await Customer.find({ gymId }).sort({ customerId: -1 }).lean();
     return customers.map(mapCustomerRecord);
   },
 
@@ -591,7 +591,7 @@ const mongoStore = {
     const page = Math.min(requestedPage, totalPages);
     const skip = (page - 1) * pageSize;
     const customers = await Customer.find(filter)
-      .sort({ customerId: 1 })
+      .sort({ customerId: -1 })
       .skip(skip)
       .limit(pageSize)
       .lean();
