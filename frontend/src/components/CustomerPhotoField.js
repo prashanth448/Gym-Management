@@ -6,6 +6,8 @@ export default function CustomerPhotoField({ photo, fullName, onChange }) {
   const streamRef = useRef(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [cameraFacingMode, setCameraFacingMode] = useState("environment");
+  const [cameraLoading, setCameraLoading] = useState(false);
 
   const stopCamera = () => {
     if (streamRef.current) {
@@ -20,37 +22,67 @@ export default function CustomerPhotoField({ photo, fullName, onChange }) {
 
   useEffect(() => stopCamera, []);
 
-  useEffect(() => {
-    if (cameraOpen && videoRef.current && streamRef.current) {
-      videoRef.current.srcObject = streamRef.current;
-      videoRef.current.play().catch(() => {});
+  const attachStreamToVideo = async (stream) => {
+    if (!videoRef.current) {
+      return;
     }
-  }, [cameraOpen]);
 
-  const startCamera = async () => {
+    videoRef.current.srcObject = stream;
+    await videoRef.current.play().catch(() => {});
+  };
+
+  const requestCameraStream = async (preferredFacingMode) => {
+    const attempts = [
+      { video: { facingMode: { exact: preferredFacingMode } }, audio: false },
+      { video: { facingMode: preferredFacingMode }, audio: false },
+      { video: true, audio: false }
+    ];
+
+    let lastError = null;
+
+    for (const constraints of attempts) {
+      try {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError;
+  };
+
+  const startCamera = async (preferredFacingMode = "environment") => {
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         setCameraError("Camera access is not supported on this device.");
         return;
       }
 
+      setCameraLoading(true);
       stopCamera();
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-        audio: false
-      });
+      const stream = await requestCameraStream(preferredFacingMode);
 
       streamRef.current = stream;
-      setCameraOpen(true);
+      setCameraFacingMode(preferredFacingMode);
       setCameraError("");
+      setCameraOpen(true);
+      await attachStreamToVideo(stream);
     } catch (error) {
       setCameraError("Unable to access the camera. Please allow camera permission.");
+      setCameraOpen(false);
+    } finally {
+      setCameraLoading(false);
     }
   };
 
   const cancelCamera = () => {
     stopCamera();
     setCameraOpen(false);
+  };
+
+  const switchCamera = async () => {
+    const nextFacingMode = cameraFacingMode === "environment" ? "user" : "environment";
+    await startCamera(nextFacingMode);
   };
 
   const capturePhoto = () => {
@@ -95,8 +127,20 @@ export default function CustomerPhotoField({ photo, fullName, onChange }) {
           <div className="camera-capture">
             <video ref={videoRef} autoPlay playsInline muted />
             <div className="camera-capture__actions">
-              <button className="button" type="button" onClick={capturePhoto}>
+              <button className="button" type="button" onClick={capturePhoto} disabled={cameraLoading}>
                 Capture photo
+              </button>
+              <button
+                className="button button--ghost"
+                type="button"
+                onClick={switchCamera}
+                disabled={cameraLoading}
+              >
+                {cameraLoading
+                  ? "Switching camera..."
+                  : cameraFacingMode === "environment"
+                    ? "Use front camera"
+                    : "Use back camera"}
               </button>
               <button className="button button--ghost" type="button" onClick={cancelCamera}>
                 Cancel
@@ -105,12 +149,22 @@ export default function CustomerPhotoField({ photo, fullName, onChange }) {
           </div>
         ) : (
           <div className="camera-capture__actions">
-            <button className="button button--ghost" type="button" onClick={startCamera}>
-              Open camera
+            <button
+              className="button button--ghost"
+              type="button"
+              onClick={() => startCamera("environment")}
+              disabled={cameraLoading}
+            >
+              {cameraLoading ? "Opening camera..." : "Open back camera"}
             </button>
             {photo ? (
-              <button className="button button--ghost" type="button" onClick={startCamera}>
-                Retake
+              <button
+                className="button button--ghost"
+                type="button"
+                onClick={() => startCamera("environment")}
+                disabled={cameraLoading}
+              >
+                Retake photo
               </button>
             ) : null}
           </div>

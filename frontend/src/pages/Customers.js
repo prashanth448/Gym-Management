@@ -52,6 +52,7 @@ export default function Customers() {
   const [renewForm, setRenewForm] = useState(null);
   const [renewError, setRenewError] = useState("");
   const [savingRenewal, setSavingRenewal] = useState(false);
+  const [zoomedPhotoCustomer, setZoomedPhotoCustomer] = useState(null);
   const latestRequestRef = useRef(0);
 
   useEffect(() => {
@@ -138,6 +139,23 @@ export default function Customers() {
       navigate(location.pathname, { replace: true });
     }
   }, [location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    if (!zoomedPhotoCustomer) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setZoomedPhotoCustomer(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [zoomedPhotoCustomer]);
+
   const editPreviewEndDate =
     editingCustomer && editForm
       ? getPlanEndDate(
@@ -193,6 +211,18 @@ export default function Customers() {
   const openDeleteModal = (customer) => {
     setCustomerToDelete(customer);
     setEditError("");
+  };
+
+  const openPhotoZoom = (customer) => {
+    if (!customer.photo) {
+      return;
+    }
+
+    setZoomedPhotoCustomer(customer);
+  };
+
+  const closePhotoZoom = () => {
+    setZoomedPhotoCustomer(null);
   };
 
   const closeEditModal = (force = false) => {
@@ -465,13 +495,22 @@ export default function Customers() {
                       <td data-label="ID">#{customer.customerId}</td>
                       <td data-label="Member">
                         <div className="member-cell">
-                          <div className="customer-photo-preview customer-photo-preview--small">
-                            {customer.photo ? (
-                              <img src={customer.photo} alt={`${customer.fullName} profile`} />
-                            ) : (
+                          {customer.photo ? (
+                            <button
+                              className="customer-photo-button"
+                              type="button"
+                              onClick={() => openPhotoZoom(customer)}
+                              aria-label={`Open ${customer.fullName} photo`}
+                            >
+                              <div className="customer-photo-preview customer-photo-preview--small">
+                                <img src={customer.photo} alt={`${customer.fullName} profile`} />
+                              </div>
+                            </button>
+                          ) : (
+                            <div className="customer-photo-preview customer-photo-preview--small">
                               <span>{getCustomerInitials(customer.fullName)}</span>
-                            )}
-                          </div>
+                            </div>
+                          )}
                           <div className="table-member">
                             <strong>{customer.fullName}</strong>
                             <span>
@@ -965,6 +1004,37 @@ export default function Customers() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {zoomedPhotoCustomer?.photo ? (
+        <div className="modal-backdrop modal-backdrop--photo" onClick={closePhotoZoom}>
+          <div
+            className="photo-lightbox"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="customer-photo-title"
+          >
+            <button
+              className="modal-close-button"
+              type="button"
+              onClick={closePhotoZoom}
+              aria-label="Close photo viewer"
+            >
+              X
+            </button>
+
+            <div className="photo-lightbox__header">
+              <h3 id="customer-photo-title">{zoomedPhotoCustomer.fullName}</h3>
+            </div>
+
+            <img
+              className="photo-lightbox__image"
+              src={zoomedPhotoCustomer.photo}
+              alt={`${zoomedPhotoCustomer.fullName} profile`}
+            />
           </div>
         </div>
       ) : null}
