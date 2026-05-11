@@ -31,6 +31,14 @@ export default function CustomerPhotoField({ photo, fullName, onChange }) {
     await videoRef.current.play().catch(() => {});
   };
 
+  useEffect(() => {
+    if (!cameraOpen || !streamRef.current || !videoRef.current) {
+      return;
+    }
+
+    attachStreamToVideo(streamRef.current);
+  }, [cameraOpen, cameraFacingMode]);
+
   const requestCameraStream = async (preferredFacingMode) => {
     const attempts = [
       { video: { facingMode: { exact: preferredFacingMode } }, audio: false },
