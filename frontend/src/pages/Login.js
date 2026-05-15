@@ -7,6 +7,21 @@ function normalizeEmail(email) {
   return email.trim().toLowerCase();
 }
 
+function PasswordVisibilityIcon({ visible }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="field-toggle__icon"
+      viewBox="0 0 24 24"
+      focusable="false"
+    >
+      <path d="M2.5 12s3.3-6 9.5-6 9.5 6 9.5 6-3.3 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="3" />
+      {!visible ? <path className="field-toggle__slash" d="M4 20 20 4" /> : null}
+    </svg>
+  );
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -190,11 +205,13 @@ export default function Login() {
                   onChange={(event) => updateField("password", event.target.value)}
                 />
                 <button
-                  className="button button--ghost field-toggle"
+                  className="field-toggle"
                   type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
                   onClick={() => setShowPassword((current) => !current)}
                 >
-                  {showPassword ? "Hide" : "Show"}
+                  <PasswordVisibilityIcon visible={showPassword} />
                 </button>
               </div>
             </label>
@@ -255,11 +272,15 @@ export default function Login() {
                       }
                     />
                     <button
-                      className="button button--ghost field-toggle"
+                      className="field-toggle"
                       type="button"
+                      aria-label={
+                        showRecoveryPassword ? "Hide new password" : "Show new password"
+                      }
+                      title={showRecoveryPassword ? "Hide new password" : "Show new password"}
                       onClick={() => setShowRecoveryPassword((current) => !current)}
                     >
-                      {showRecoveryPassword ? "Hide" : "Show"}
+                      <PasswordVisibilityIcon visible={showRecoveryPassword} />
                     </button>
                   </div>
                 </label>

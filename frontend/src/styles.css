@@ -583,8 +583,43 @@ select {
 }
 
 .field-toggle {
-  min-width: 5.25rem;
-  padding-inline: 0.9rem;
+  width: 3.1rem;
+  height: 3.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(31, 42, 36, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--primary-dark);
+  cursor: pointer;
+  box-shadow: none;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+
+.field-toggle:hover {
+  transform: translateY(-1px);
+  border-color: rgba(14, 107, 89, 0.28);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.field-toggle:focus-visible {
+  outline: 3px solid rgba(243, 170, 47, 0.34);
+  outline-offset: 3px;
+}
+
+.field-toggle__icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.field-toggle__slash {
+  stroke-width: 2.25;
 }
 
 .app-shell {
@@ -1330,14 +1365,13 @@ select {
   }
 
   .field-inline {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .field--compact {
     min-width: 0;
   }
 
-  .field-toggle,
   .hero-card__actions > .button,
   .auth-actions > .button,
   .form-actions > .button,
