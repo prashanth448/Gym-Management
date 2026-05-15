@@ -255,6 +255,18 @@ select {
   background: currentColor;
 }
 
+.auth-brand {
+  display: grid;
+  gap: 1rem;
+}
+
+.auth-brand img {
+  width: 5.2rem;
+  height: 5.2rem;
+  border-radius: 22px;
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.22);
+}
+
 .auth-hero h1,
 .auth-card h2,
 .app-shell__sidebar h1,
@@ -387,15 +399,24 @@ select {
 
 .brand-mark {
   display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
   width: fit-content;
   margin-bottom: 1.2rem;
-  padding: 0.42rem 0.75rem;
+  padding: 0.34rem 0.75rem 0.34rem 0.38rem;
   border-radius: 999px;
   background: rgba(243, 170, 47, 0.18);
   color: #ffd48c;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.brand-mark img {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  flex: none;
 }
 
 .app-shell__sidebar h1 {

@@ -6,6 +6,7 @@ export default function AppShell() {
   const navigate = useNavigate();
   const session = getStoredSession();
   const isAdmin = session?.role === "admin";
+  const logoUrl = `${process.env.PUBLIC_URL || ""}/icons/icon-192.png`;
   const todayLabel = new Intl.DateTimeFormat("en-US", {
     dateStyle: "full"
   }).format(new Date());
@@ -29,7 +30,10 @@ export default function AppShell() {
     <div className="app-shell">
       <aside className="app-shell__sidebar">
         <div className="app-shell__sidebar-top">
-          <div className="brand-mark">fitLedger</div>
+          <div className="brand-mark">
+            <img src={logoUrl} alt="" />
+            <span>fitLedger</span>
+          </div>
           <nav className="app-shell__nav" aria-label="Primary">
             {navItems.map((item) => (
               <NavLink

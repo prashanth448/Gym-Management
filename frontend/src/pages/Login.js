@@ -29,6 +29,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = location.state?.from;
+  const logoUrl = `${process.env.PUBLIC_URL || ""}/icons/icon-192.png`;
   const expiredMessage =
     location.state?.reason === "expired" ? "Your session expired. Please sign in again." : "";
   const [form, setForm] = useState({ email: "", password: "" });
@@ -152,7 +153,10 @@ export default function Login() {
       <section className="auth-hero">
         <div className="auth-hero-copy">
           <span className="eyebrow">Gym operations, simplified</span>
-          <h1>fitLedger</h1>
+          <div className="auth-brand">
+            <img src={logoUrl} alt="" />
+            <h1>fitLedger</h1>
+          </div>
           <p>
             A focused dashboard for managing members, payments, attendance, and day-to-day
             gym operations without the usual spreadsheet sprawl.
