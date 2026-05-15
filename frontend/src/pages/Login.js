@@ -7,24 +7,6 @@ function normalizeEmail(email) {
   return email.trim().toLowerCase();
 }
 
-const APP_FACTS = [
-  {
-    title: "Real-time floor pulse",
-    description:
-      "Attendance, payments, and customer updates stay in sync so the front desk always sees the latest activity."
-  },
-  {
-    title: "Built for daily gym ops",
-    description:
-      "FitLedger keeps member records, renewals, and collections in one workflow instead of scattered notebooks and chats."
-  },
-  {
-    title: "Owner and admin ready",
-    description:
-      "The app supports role-based access, so each gym can manage its own members while admin users oversee the bigger picture."
-  }
-];
-
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -150,26 +132,22 @@ export default function Login() {
 
   return (
     <div className="auth-layout">
+      <div className="auth-equipment-scene" aria-hidden="true">
+        <span className="equipment equipment--barbell equipment--one" />
+        <span className="equipment equipment--plate equipment--two" />
+        <span className="equipment equipment--kettlebell equipment--three" />
+        <span className="equipment equipment--dumbbell equipment--four" />
+        <span className="equipment equipment--barbell equipment--five" />
+        <span className="equipment equipment--plate equipment--six" />
+      </div>
+
       <section className="auth-hero">
         <div className="auth-hero-copy">
-          <span className="eyebrow">Gym operations, simplified</span>
+          <span className="eyebrow">Gym operations</span>
           <div className="auth-brand">
             <img src={logoUrl} alt="" />
             <h1>fitLedger</h1>
           </div>
-          <p>
-            A focused dashboard for managing members, payments, attendance, and day-to-day
-            gym operations without the usual spreadsheet sprawl.
-          </p>
-        </div>
-
-        <div className="auth-feature-list">
-          {APP_FACTS.map((fact) => (
-            <article className="auth-feature" key={fact.title}>
-              <strong>{fact.title}</strong>
-              <span>{fact.description}</span>
-            </article>
-          ))}
         </div>
       </section>
 
