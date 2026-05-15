@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import CustomerPhotoField from "../components/CustomerPhotoField";
 import { normalizeCustomerForm } from "../components/CustomerForm";
 import API, { getApiError } from "../services/api";
 import { subscribeToRealtime } from "../services/realtime";
@@ -753,6 +754,12 @@ export default function Customers() {
                   Clear date
                 </button>
               </label>
+
+              <CustomerPhotoField
+                photo={editForm.photo}
+                fullName={editForm.fullName}
+                onChange={(value) => updateEditField("photo", value)}
+              />
 
               <div className="modal-summary">
                 <div className="info-card__row">

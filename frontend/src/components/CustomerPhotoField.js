@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { getCustomerInitials } from "../utils/customerPhoto";
+import { getCustomerInitials, readCustomerPhoto } from "../utils/customerPhoto";
 
 export default function CustomerPhotoField({ photo, fullName, onChange }) {
   const videoRef = useRef(null);
+  const fileInputRef = useRef(null);
   const streamRef = useRef(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [uploadError, setUploadError] = useState("");
   const [cameraFacingMode, setCameraFacingMode] = useState("environment");
   const [cameraLoading, setCameraLoading] = useState(false);
 
@@ -115,7 +117,30 @@ export default function CustomerPhotoField({ photo, fullName, onChange }) {
 
     context.drawImage(video, 0, 0, width, height);
     onChange(canvas.toDataURL("image/jpeg", 0.85));
+    setUploadError("");
     cancelCamera();
+  };
+
+  const uploadPhoto = async (event) => {
+    const [file] = Array.from(event.target.files || []);
+
+    try {
+      const nextPhoto = await readCustomerPhoto(file);
+      onChange(nextPhoto);
+      setUploadError("");
+      setCameraError("");
+      cancelCamera();
+    } catch (error) {
+      setUploadError(error.message || "Unable to upload this image.");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const removePhoto = () => {
+    onChange("");
+    setUploadError("");
+    setCameraError("");
   };
 
   return (
@@ -130,6 +155,13 @@ export default function CustomerPhotoField({ photo, fullName, onChange }) {
 
       <div className="photo-field__controls">
         <span className="field-label">Profile photo</span>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="visually-hidden"
+          onChange={uploadPhoto}
+        />
 
         {cameraOpen ? (
           <div className="camera-capture">
@@ -158,6 +190,13 @@ export default function CustomerPhotoField({ photo, fullName, onChange }) {
         ) : (
           <div className="camera-capture__actions">
             <button
+              className="button"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              Upload photo
+            </button>
+            <button
               className="button button--ghost"
               type="button"
               onClick={() => startCamera("environment")}
@@ -182,8 +221,12 @@ export default function CustomerPhotoField({ photo, fullName, onChange }) {
           <div className="panel-empty panel-empty--error">{cameraError}</div>
         ) : null}
 
+        {uploadError ? (
+          <div className="panel-empty panel-empty--error">{uploadError}</div>
+        ) : null}
+
         {photo ? (
-          <button className="text-link" type="button" onClick={() => onChange("")}>
+          <button className="text-link" type="button" onClick={removePhoto}>
             Remove photo
           </button>
         ) : null}

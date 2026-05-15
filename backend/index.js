@@ -52,7 +52,7 @@ async function startServer() {
   );
   app.use(cors(corsOptions));
   app.use(requestLogger);
-  app.use(express.json());
+  app.use(express.json({ limit: "3mb" }));
 
   app.use("/api/health", require("./routes/health"));
   app.use("/api", apiLimiter);
