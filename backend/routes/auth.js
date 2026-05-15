@@ -24,7 +24,7 @@ const {
 } = require("../utils/otp");
 const { deliverOtp } = require("../utils/otpDelivery");
 
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN?.trim() || "3d";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN?.trim() || "2d";
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
