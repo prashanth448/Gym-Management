@@ -9,6 +9,7 @@ const { configureStore, getStoreMode } = require("./data/store");
 const requestLogger = require("./middleware/requestLogger");
 const { apiLimiter } = require("./middleware/rateLimit");
 const { initRealtime } = require("./realtime");
+const { startCustomerStatusScheduler } = require("./services/customerStatusScheduler");
 const { startWhatsAppReminderScheduler } = require("./services/whatsappReminderScheduler");
 
 function isProductionEnv() {
@@ -63,6 +64,7 @@ async function startServer() {
 
   const server = http.createServer(app);
   initRealtime(server);
+  startCustomerStatusScheduler();
 
   server.listen(port, () =>
     console.log(`Server running on ${port} using ${getStoreMode()}.`)

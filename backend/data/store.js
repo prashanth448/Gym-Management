@@ -670,6 +670,60 @@ const mongoStore = {
     };
   },
 
+  async syncCustomerMembershipStatuses(options = {}) {
+    const today = options.today || getTodayDate();
+    const expiringThreshold = options.expiringThreshold || addDaysToDateString(today, 3);
+    const touchedGymIds = new Set();
+    const updated = {
+      Active: 0,
+      Expiring: 0,
+      Expired: 0
+    };
+    const syncRules = [
+      {
+        status: "Expired",
+        filter: {
+          planEnd: { $lt: today }
+        }
+      },
+      {
+        status: "Expiring",
+        filter: {
+          planEnd: { $gte: today, $lte: expiringThreshold }
+        }
+      },
+      {
+        status: "Active",
+        filter: {
+          planEnd: { $gt: expiringThreshold }
+        }
+      }
+    ];
+
+    for (const rule of syncRules) {
+      const filter = {
+        ...rule.filter,
+        status: { $ne: rule.status }
+      };
+      const gymIds = await Customer.distinct("gymId", filter);
+      const result = await Customer.updateMany(filter, {
+        $set: {
+          status: rule.status
+        }
+      });
+
+      updated[rule.status] = result.modifiedCount || 0;
+      gymIds.forEach((gymId) => touchedGymIds.add(gymId));
+    }
+
+    return {
+      today,
+      expiringThreshold,
+      updated,
+      touchedGymIds: [...touchedGymIds]
+    };
+  },
+
   async getDashboardSnapshot(gymId) {
     const [summary, latestMembers, recentAttendance] = await Promise.all([
       this.getCustomerDirectorySummary(gymId),
