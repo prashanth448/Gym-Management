@@ -787,6 +787,301 @@ select {
   font-size: 2.3rem;
 }
 
+.dashboard-page {
+  gap: 1.1rem;
+  animation: dashboardFadeIn 420ms ease both;
+}
+
+.dashboard-hero {
+  position: relative;
+  overflow: hidden;
+  align-items: center;
+  min-height: 10.5rem;
+  background:
+    linear-gradient(135deg, rgba(255, 253, 248, 0.98), rgba(242, 250, 247, 0.9) 48%, rgba(255, 246, 225, 0.9)),
+    var(--panel);
+  box-shadow:
+    0 26px 70px rgba(19, 28, 24, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.dashboard-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto -5rem -7rem auto;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(14, 107, 89, 0.18), transparent 68%);
+  pointer-events: none;
+}
+
+.dashboard-hero__copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.45rem;
+  max-width: 38rem;
+}
+
+.dashboard-hero__copy p,
+.dashboard-panel .panel-card__header p,
+.dashboard-health-panel .panel-card__header p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.dashboard-kicker {
+  color: var(--primary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dashboard-metric {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 1rem;
+  min-height: 9.4rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 252, 245, 0.62)),
+    var(--panel);
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 18px 46px rgba(19, 28, 24, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  animation: dashboardCardIn 420ms ease both;
+  animation-delay: var(--animation-delay);
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.dashboard-metric::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 0.35rem;
+  background: var(--primary);
+}
+
+.dashboard-metric:hover {
+  transform: translateY(-3px);
+  border-color: rgba(14, 107, 89, 0.24);
+  box-shadow:
+    0 24px 58px rgba(19, 28, 24, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.dashboard-metric--success::before,
+.dashboard-metric--success .dashboard-metric__icon {
+  background: rgba(25, 120, 95, 0.14);
+  color: var(--success);
+}
+
+.dashboard-metric--warning::before,
+.dashboard-metric--warning .dashboard-metric__icon {
+  background: rgba(215, 131, 29, 0.14);
+  color: var(--warning);
+}
+
+.dashboard-metric--danger::before,
+.dashboard-metric--danger .dashboard-metric__icon {
+  background: rgba(198, 82, 55, 0.14);
+  color: var(--danger);
+}
+
+.dashboard-metric--neutral::before,
+.dashboard-metric--neutral .dashboard-metric__icon {
+  background: rgba(14, 107, 89, 0.12);
+  color: var(--primary);
+}
+
+.dashboard-metric__topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.dashboard-metric__icon {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border-radius: 14px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.dashboard-health-panel,
+.dashboard-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(255, 252, 245, 0.62)),
+    var(--panel);
+  box-shadow:
+    0 20px 52px rgba(19, 28, 24, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.dashboard-health-bar {
+  display: flex;
+  height: 0.9rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(31, 42, 36, 0.08);
+  box-shadow: inset 0 1px 2px rgba(19, 28, 24, 0.12);
+}
+
+.dashboard-health-bar__segment {
+  min-width: 0;
+  transition: width 360ms ease;
+}
+
+.dashboard-health-bar__segment--success {
+  background: linear-gradient(90deg, #19785f, #42a583);
+}
+
+.dashboard-health-bar__segment--warning {
+  background: linear-gradient(90deg, #d7831d, #f0b657);
+}
+
+.dashboard-health-bar__segment--danger {
+  background: linear-gradient(90deg, #c65237, #e5866f);
+}
+
+.dashboard-health-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem 1.1rem;
+  margin-top: 1rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.dashboard-health-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.legend-dot {
+  width: 0.58rem;
+  height: 0.58rem;
+  display: inline-flex;
+  border-radius: 999px;
+}
+
+.legend-dot--success {
+  background: var(--success);
+}
+
+.legend-dot--warning {
+  background: var(--warning);
+}
+
+.legend-dot--danger {
+  background: var(--danger);
+}
+
+.dashboard-panel-grid {
+  align-items: start;
+}
+
+.dashboard-list-row {
+  margin-inline: -0.35rem;
+  padding-inline: 0.35rem;
+  border-radius: 16px;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.dashboard-list-row:hover {
+  background: rgba(255, 255, 255, 0.5);
+  transform: translateX(2px);
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(31, 42, 36, 0.09);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  translate: -100% 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+  animation: skeletonShimmer 1100ms ease-in-out infinite;
+}
+
+.skeleton--metric {
+  width: 5.5rem;
+  height: 2.8rem;
+  border-radius: 16px;
+}
+
+.skeleton--line {
+  height: 0.8rem;
+}
+
+.skeleton--line-medium {
+  width: 10rem;
+}
+
+.skeleton--line-short {
+  width: 6.5rem;
+}
+
+.skeleton--pill {
+  width: 5rem;
+  height: 1.75rem;
+}
+
+.skeleton--bar {
+  height: 0.9rem;
+  margin-top: 0.6rem;
+}
+
+@keyframes dashboardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dashboardCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes skeletonShimmer {
+  to {
+    translate: 100% 0;
+  }
+}
+
 .panel-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
