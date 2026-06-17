@@ -49,6 +49,8 @@ export default function Customers() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState(null);
   const [deletingCustomer, setDeletingCustomer] = useState(false);
+  const [confirmExpiredReminders, setConfirmExpiredReminders] = useState(false);
+  const [sendingExpiredReminders, setSendingExpiredReminders] = useState(false);
   const [renewingCustomer, setRenewingCustomer] = useState(null);
   const [renewForm, setRenewForm] = useState(null);
   const [renewError, setRenewError] = useState("");
@@ -214,6 +216,10 @@ export default function Customers() {
     setEditError("");
   };
 
+  const openExpiredReminderModal = () => {
+    setConfirmExpiredReminders(true);
+  };
+
   const openPhotoZoom = (customer) => {
     if (!customer.photo) {
       return;
@@ -252,6 +258,14 @@ export default function Customers() {
     }
 
     setCustomerToDelete(null);
+  };
+
+  const closeExpiredReminderModal = (force = false) => {
+    if (sendingExpiredReminders && !force) {
+      return;
+    }
+
+    setConfirmExpiredReminders(false);
   };
 
   const updateEditField = (key, value) => {
@@ -337,6 +351,25 @@ export default function Customers() {
     }
   };
 
+  const handleSendExpiredReminders = async () => {
+    setSendingExpiredReminders(true);
+    setError("");
+
+    try {
+      const response = await API.post("/customers/reminders/expired");
+      const sentCount = Number(response.data?.sentCount || 0);
+      setFlashMessage(
+        `Sent reminder message for ${sentCount} member${sentCount === 1 ? "" : "s"}.`
+      );
+      closeExpiredReminderModal(true);
+      setReloadToken((current) => current + 1);
+    } catch (requestError) {
+      setError(getApiError(requestError, "Unable to send expired member reminders."));
+    } finally {
+      setSendingExpiredReminders(false);
+    }
+  };
+
   const handleRenewSubmit = async (event) => {
     event.preventDefault();
 
@@ -385,9 +418,19 @@ export default function Customers() {
         <div>
           <h2>Customers</h2>
         </div>
-        <Link className="button" to="/add">
-          Add Customer
-        </Link>
+        <div className="page-actions">
+          <button
+            className="button button--ghost"
+            type="button"
+            onClick={openExpiredReminderModal}
+            disabled={loading || !summary.expiredCount}
+          >
+            Send Expired Reminders
+          </button>
+          <Link className="button" to="/add">
+            Add Customer
+          </Link>
+        </div>
       </section>
 
       {flashMessage ? (
@@ -864,6 +907,61 @@ export default function Customers() {
                   type="button"
                   onClick={closeDeleteModal}
                   disabled={deletingCustomer}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmExpiredReminders ? (
+        <div className="modal-backdrop" onClick={closeExpiredReminderModal}>
+          <div
+            className="modal-card modal-card--compact"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="expired-reminders-title"
+          >
+            <div className="modal-card__header">
+              <div>
+                <h3 id="expired-reminders-title">Send expired member reminders?</h3>
+                <p>
+                  This will send a WhatsApp reminder to every expired member in this gym.
+                </p>
+              </div>
+              <button
+                className="modal-close-button"
+                type="button"
+                onClick={closeExpiredReminderModal}
+                aria-label="Close reminder dialog"
+                disabled={sendingExpiredReminders}
+              >
+                X
+              </button>
+            </div>
+
+            <div className="modal-form">
+              <div className="status-banner">
+                Are you sure you want to send the messages for expired members?
+              </div>
+
+              <div className="form-actions">
+                <button
+                  className="button"
+                  type="button"
+                  onClick={handleSendExpiredReminders}
+                  disabled={sendingExpiredReminders}
+                >
+                  {sendingExpiredReminders ? "Sending..." : "OK, send reminders"}
+                </button>
+                <button
+                  className="button button--ghost"
+                  type="button"
+                  onClick={closeExpiredReminderModal}
+                  disabled={sendingExpiredReminders}
                 >
                   Cancel
                 </button>

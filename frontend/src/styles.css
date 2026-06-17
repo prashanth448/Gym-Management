@@ -741,6 +741,13 @@ select {
   gap: 1rem;
 }
 
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.8rem;
+}
+
 .hero-card,
 .panel-card {
   border-radius: var(--radius-lg);
@@ -1422,6 +1429,10 @@ select {
   box-shadow: 0 28px 80px rgba(19, 28, 24, 0.24);
 }
 
+.modal-card--compact {
+  width: min(560px, 100%);
+}
+
 .modal-card__header,
 .modal-summary {
   display: grid;
@@ -1670,6 +1681,7 @@ select {
   .hero-card__actions > .button,
   .auth-actions > .button,
   .form-actions > .button,
+  .page-actions > .button,
   .camera-capture__actions > .button {
     width: 100%;
   }

@@ -2,10 +2,15 @@
 const router = require("express").Router();
 const auth = require("../middleware/auth");
 const { getStore } = require("../data/store");
+const Customer = require("../models/Customer");
 const { emitAdminDataChanged, emitGymDataChanged } = require("../realtime");
 const { getTodayDate, parseDateOnly } = require("../utils/date");
 const { getPlanEnd, isValidPlan } = require("../utils/plan");
 const { isValidPhoneNumber, normalizePhoneNumber } = require("../utils/otp");
+const {
+  sendWhatsAppMessage,
+  toWhatsAppRecipient
+} = require("../utils/whatsappReminders");
 
 function requireOwner(req, res) {
   if (req.user.role !== "owner") {
@@ -169,6 +174,23 @@ function validateRenewalPayload(payload) {
   return "";
 }
 
+function buildExpiredMembershipReminderMessage(gymName) {
+  const locationName = String(gymName || "your gym").trim();
+
+  return `Hi your gym membership is expired in ${locationName}. Please contact gym owner to renew membership`;
+}
+
+function getExpiredReminderCustomerProjection() {
+  return {
+    _id: 0,
+    gymId: 1,
+    customerId: 1,
+    fullName: 1,
+    phone: 1,
+    planEnd: 1
+  };
+}
+
 router.get("/", auth, async (req, res) => {
   if (!requireOwner(req, res)) {
     return;
@@ -238,6 +260,94 @@ router.get("/dashboard", auth, async (req, res) => {
 
   const snapshot = await getStore().getDashboardSnapshot(req.user.gymId);
   res.json(snapshot);
+});
+
+router.post("/reminders/expired", auth, async (req, res) => {
+  if (!requireOwner(req, res)) {
+    return;
+  }
+
+  const today = getTodayDate();
+  const gymName = req.user.gymName || "your gym";
+  const message = buildExpiredMembershipReminderMessage(gymName);
+
+  try {
+    const expiredCustomers = await Customer.find(
+      {
+        gymId: req.user.gymId,
+        planEnd: { $lt: today },
+        phone: { $ne: "" }
+      },
+      getExpiredReminderCustomerProjection()
+    ).lean();
+
+    let sentCount = 0;
+    let failedCount = 0;
+    const failures = [];
+
+    for (const customer of expiredCustomers) {
+      try {
+        const recipient = toWhatsAppRecipient(customer.phone, {
+          defaultCountryCode: process.env.WHATSAPP_DEFAULT_COUNTRY_CODE
+        });
+
+        await sendWhatsAppMessage({
+          to: recipient,
+          body: message
+        });
+
+        await Customer.updateOne(
+          {
+            gymId: req.user.gymId,
+            customerId: customer.customerId
+          },
+          {
+            $set: {
+              lastReminderChannel: "whatsapp",
+              lastReminderType: "expired-manual",
+              lastReminderPlanEnd: customer.planEnd,
+              lastReminderSentOn: today
+            }
+          }
+        );
+
+        sentCount += 1;
+      } catch (error) {
+        failedCount += 1;
+        failures.push(`${customer.fullName}: ${error.message}`);
+      }
+    }
+
+    if (sentCount > 0) {
+      emitGymDataChanged(req.user.gymId, "expired-reminders-sent");
+    }
+
+    const messageParts = [];
+
+    if (!expiredCustomers.length) {
+      messageParts.push("No expired members found.");
+    } else if (sentCount > 0) {
+      messageParts.push(
+        `${sentCount} expired member reminder${sentCount === 1 ? "" : "s"} sent.`
+      );
+    }
+
+    if (failedCount > 0) {
+      messageParts.push(`${failedCount} reminder${failedCount === 1 ? "" : "s"} failed.`);
+    }
+
+    res.json({
+      eligibleCount: expiredCustomers.length,
+      sentCount,
+      failedCount,
+      failures,
+      reminderMessage: message,
+      message: messageParts.join(" ")
+    });
+  } catch (error) {
+    console.error("Unable to send expired member reminders.", error);
+    res.status(500).json({ message: "Unable to send expired member reminders." });
+  }
 });
 
 router.get("/:customerId", auth, async (req, res) => {

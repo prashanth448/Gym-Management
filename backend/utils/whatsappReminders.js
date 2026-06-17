@@ -11,22 +11,14 @@ const currencyFormatter = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 0
 });
 
-function toWhatsAppAddress(value, options = {}) {
+function toWhatsAppRecipient(value, options = {}) {
   const rawValue = String(value || "").trim();
 
   if (!rawValue) {
     throw new Error("A WhatsApp phone number is required.");
   }
 
-  if (rawValue.startsWith("whatsapp:")) {
-    return rawValue;
-  }
-
-  if (rawValue.startsWith("+")) {
-    return `whatsapp:${rawValue}`;
-  }
-
-  const digits = normalizePhoneNumber(rawValue);
+  const digits = normalizePhoneNumber(rawValue.replace(/^whatsapp:/i, ""));
 
   if (!digits) {
     throw new Error("A valid WhatsApp phone number is required.");
@@ -42,20 +34,17 @@ function toWhatsAppAddress(value, options = {}) {
     );
   }
 
-  return `whatsapp:+${e164Digits}`;
+  return e164Digits;
 }
 
 function getConfiguredWhatsAppSender() {
-  const configuredSender =
-    process.env.TWILIO_WHATSAPP_FROM || process.env.TWILIO_FROM_NUMBER || "";
+  return process.env.META_WHATSAPP_PHONE_NUMBER_ID?.trim() || "";
+}
 
-  if (!configuredSender.trim()) {
-    return "";
-  }
+function getMetaWhatsAppApiVersion() {
+  const configuredVersion = process.env.META_WHATSAPP_API_VERSION?.trim() || "v20.0";
 
-  return toWhatsAppAddress(configuredSender, {
-    defaultCountryCode: process.env.WHATSAPP_DEFAULT_COUNTRY_CODE
-  });
+  return configuredVersion.startsWith("v") ? configuredVersion : `v${configuredVersion}`;
 }
 
 function formatDisplayDate(value) {
@@ -74,19 +63,27 @@ function formatCurrency(value) {
   return currencyFormatter.format(Number(value || 0));
 }
 
+function getReminderDisplayValues({ customer, gymName }) {
+  return {
+    firstName: String(customer.fullName || "Member").trim().split(/\s+/)[0] || "Member",
+    locationName: String(gymName || "your gym").trim(),
+    formattedPlanEnd: formatDisplayDate(customer.planEnd),
+    formattedDueAmount: formatCurrency(customer.dueAmount)
+  };
+}
+
 function buildReminderMessage({ customer, gymName, reminderType }) {
-  const firstName = String(customer.fullName || "Member").trim().split(/\s+/)[0] || "Member";
-  const locationName = String(gymName || "your gym").trim();
+  const { firstName, locationName, formattedPlanEnd, formattedDueAmount } =
+    getReminderDisplayValues({ customer, gymName });
 
   if (reminderType === "due-amount") {
     return [
-      `Hi ${firstName}, you have a pending due amount of ${formatCurrency(customer.dueAmount)} in ${locationName}.`,
+      `Hi ${firstName}, you have a pending due amount of ${formattedDueAmount} in ${locationName}.`,
       "Please clear the due amount.",
       "Reply to this message or contact the gym front desk if you need help."
     ].join(" ");
   }
 
-  const formattedPlanEnd = formatDisplayDate(customer.planEnd);
   const intro =
     reminderType === "expired"
       ? `your membership in ${locationName} has expired on ${formattedPlanEnd}.`
@@ -97,6 +94,56 @@ function buildReminderMessage({ customer, gymName, reminderType }) {
     "Please renew your membership to continue your workouts without interruption.",
     "Reply to this message or contact the gym front desk if you need help."
   ].join(" ");
+}
+
+function getReminderTemplateName(reminderType) {
+  const templateEnvByType = {
+    "due-amount": "META_WHATSAPP_DUE_AMOUNT_TEMPLATE_NAME",
+    expired: "META_WHATSAPP_EXPIRED_TEMPLATE_NAME",
+    expiring: "META_WHATSAPP_EXPIRING_TEMPLATE_NAME"
+  };
+  const specificTemplate = process.env[templateEnvByType[reminderType]]?.trim();
+
+  return specificTemplate || process.env.META_WHATSAPP_TEMPLATE_NAME?.trim() || "";
+}
+
+function buildTemplateParameter(value) {
+  return {
+    type: "text",
+    text: String(value || "")
+  };
+}
+
+function buildReminderTemplatePayload({ customer, gymName, reminderType }) {
+  const templateName = getReminderTemplateName(reminderType);
+
+  if (!templateName) {
+    return null;
+  }
+
+  const { firstName, locationName, formattedPlanEnd, formattedDueAmount } =
+    getReminderDisplayValues({ customer, gymName });
+  const languageCode = process.env.META_WHATSAPP_TEMPLATE_LANGUAGE?.trim() || "en_US";
+  const parameters =
+    reminderType === "due-amount"
+      ? [firstName, formattedDueAmount, locationName]
+      : [firstName, locationName, formattedPlanEnd];
+
+  return {
+    type: "template",
+    template: {
+      name: templateName,
+      language: {
+        code: languageCode
+      },
+      components: [
+        {
+          type: "body",
+          parameters: parameters.map(buildTemplateParameter)
+        }
+      ]
+    }
+  };
 }
 
 function getReminderHistory(customer) {
@@ -182,29 +229,35 @@ function getDueAmountReminderEvent(customer, today) {
   };
 }
 
-async function sendWhatsAppMessage({ to, body }) {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const from = getConfiguredWhatsAppSender();
+async function sendWhatsAppMessage({ to, body, templatePayload }) {
+  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
+  const phoneNumberId = getConfiguredWhatsAppSender();
 
-  if (!accountSid || !authToken || !from) {
+  if (!accessToken || !phoneNumberId) {
     throw new Error(
-      "Configure TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_WHATSAPP_FROM before sending WhatsApp reminders."
+      "Configure META_WHATSAPP_ACCESS_TOKEN and META_WHATSAPP_PHONE_NUMBER_ID before sending WhatsApp reminders."
     );
   }
 
   const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+    `https://graph.facebook.com/${getMetaWhatsAppApiVersion()}/${phoneNumberId}/messages`,
     {
       method: "POST",
       headers: {
-        Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
-        "Content-Type": "application/x-www-form-urlencoded"
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
       },
-      body: new URLSearchParams({
-        To: to,
-        From: from,
-        Body: body
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        ...(templatePayload || {
+          type: "text",
+          text: {
+            preview_url: false,
+            body
+          }
+        })
       })
     }
   );
@@ -218,14 +271,15 @@ async function sendWhatsAppMessage({ to, body }) {
 }
 
 async function sendMembershipReminder({ customer, gymName, reminderType }) {
-  const recipient = toWhatsAppAddress(customer.phone, {
+  const recipient = toWhatsAppRecipient(customer.phone, {
     defaultCountryCode: process.env.WHATSAPP_DEFAULT_COUNTRY_CODE
   });
   const body = buildReminderMessage({ customer, gymName, reminderType });
-  const response = await sendWhatsAppMessage({ to: recipient, body });
+  const templatePayload = buildReminderTemplatePayload({ customer, gymName, reminderType });
+  const response = await sendWhatsAppMessage({ to: recipient, body, templatePayload });
 
   return {
-    sid: response.sid,
+    messageId: response.messages?.[0]?.id || "",
     reminderType
   };
 }
@@ -236,13 +290,17 @@ module.exports = {
   EXPIRY_REMINDER_OFFSETS,
   buildReminderMessage,
   buildReminderKey,
+  buildReminderTemplatePayload,
   formatDisplayDate,
   formatCurrency,
   getDueReminderEvent,
   getDueAmountReminderEvent,
   getReminderHistory,
   getConfiguredWhatsAppSender,
+  getMetaWhatsAppApiVersion,
   hasReminderBeenSent,
+  sendWhatsAppMessage,
   sendMembershipReminder,
-  toWhatsAppAddress
+  toWhatsAppRecipient,
+  toWhatsAppAddress: toWhatsAppRecipient
 };
