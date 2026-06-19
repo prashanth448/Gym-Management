@@ -8,6 +8,8 @@ const { getTodayDate, parseDateOnly } = require("../utils/date");
 const { getPlanEnd, isValidPlan } = require("../utils/plan");
 const { isValidPhoneNumber, normalizePhoneNumber } = require("../utils/otp");
 const {
+  buildReminderMessage,
+  buildReminderTemplatePayload,
   sendWhatsAppMessage,
   toWhatsAppRecipient
 } = require("../utils/whatsappReminders");
@@ -174,12 +176,6 @@ function validateRenewalPayload(payload) {
   return "";
 }
 
-function buildExpiredMembershipReminderMessage(gymName) {
-  const locationName = String(gymName || "your gym").trim();
-
-  return `Hi your gym membership is expired in ${locationName}. Please contact gym owner to renew membership`;
-}
-
 function getExpiredReminderCustomerProjection() {
   return {
     _id: 0,
@@ -269,7 +265,6 @@ router.post("/reminders/expired", auth, async (req, res) => {
 
   const today = getTodayDate();
   const gymName = req.user.gymName || "your gym";
-  const message = buildExpiredMembershipReminderMessage(gymName);
 
   try {
     const expiredCustomers = await Customer.find(
@@ -290,10 +285,28 @@ router.post("/reminders/expired", auth, async (req, res) => {
         const recipient = toWhatsAppRecipient(customer.phone, {
           defaultCountryCode: process.env.WHATSAPP_DEFAULT_COUNTRY_CODE
         });
+        const message = buildReminderMessage({
+          customer,
+          gymName,
+          reminderType: "expired"
+        });
+        const templatePayload = buildReminderTemplatePayload({
+          customer,
+          gymName,
+          reminderType: "expired"
+        });
+
+        if (!templatePayload) {
+          return res.status(400).json({
+            message:
+              "Configure META_WHATSAPP_EXPIRED_TEMPLATE_NAME before sending expired member reminders."
+          });
+        }
 
         await sendWhatsAppMessage({
           to: recipient,
-          body: message
+          body: message,
+          templatePayload
         });
 
         await Customer.updateOne(
@@ -341,7 +354,6 @@ router.post("/reminders/expired", auth, async (req, res) => {
       sentCount,
       failedCount,
       failures,
-      reminderMessage: message,
       message: messageParts.join(" ")
     });
   } catch (error) {

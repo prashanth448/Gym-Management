@@ -359,7 +359,8 @@ export default function Customers() {
       const response = await API.post("/customers/reminders/expired");
       const sentCount = Number(response.data?.sentCount || 0);
       setFlashMessage(
-        `Sent reminder message for ${sentCount} member${sentCount === 1 ? "" : "s"}.`
+        response.data?.message ||
+          `Sent reminder message for ${sentCount} member${sentCount === 1 ? "" : "s"}.`
       );
       closeExpiredReminderModal(true);
       setReloadToken((current) => current + 1);
