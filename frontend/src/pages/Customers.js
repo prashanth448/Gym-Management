@@ -51,6 +51,7 @@ export default function Customers() {
   const [deletingCustomer, setDeletingCustomer] = useState(false);
   const [confirmExpiredReminders, setConfirmExpiredReminders] = useState(false);
   const [sendingExpiredReminders, setSendingExpiredReminders] = useState(false);
+  const [expiredReminderJob, setExpiredReminderJob] = useState(null);
   const [renewingCustomer, setRenewingCustomer] = useState(null);
   const [renewForm, setRenewForm] = useState(null);
   const [renewError, setRenewError] = useState("");
@@ -266,7 +267,43 @@ export default function Customers() {
     }
 
     setConfirmExpiredReminders(false);
+    setExpiredReminderJob(null);
   };
+
+  useEffect(() => {
+    if (
+      !sendingExpiredReminders ||
+      !expiredReminderJob?.jobId ||
+      ["completed", "failed"].includes(expiredReminderJob.status)
+    ) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await API.get(`/customers/reminders/expired/${expiredReminderJob.jobId}`);
+        const nextJob = response.data;
+        setExpiredReminderJob(nextJob);
+
+        if (nextJob.status === "completed") {
+          setFlashMessage(nextJob.message || "Expired member reminders finished.");
+          closeExpiredReminderModal(true);
+          setSendingExpiredReminders(false);
+          setReloadToken((current) => current + 1);
+        } else if (nextJob.status === "failed") {
+          setError(nextJob.message || "Unable to send expired member reminders.");
+          closeExpiredReminderModal(true);
+          setSendingExpiredReminders(false);
+        }
+      } catch (requestError) {
+        setError(getApiError(requestError, "Unable to check reminder progress."));
+        closeExpiredReminderModal(true);
+        setSendingExpiredReminders(false);
+      }
+    }, 2000);
+
+    return () => window.clearTimeout(timer);
+  }, [expiredReminderJob, sendingExpiredReminders]);
 
   const updateEditField = (key, value) => {
     setEditForm((current) => ({ ...current, [key]: value }));
@@ -354,19 +391,23 @@ export default function Customers() {
   const handleSendExpiredReminders = async () => {
     setSendingExpiredReminders(true);
     setError("");
+    setExpiredReminderJob(null);
 
     try {
       const response = await API.post("/customers/reminders/expired");
-      const sentCount = Number(response.data?.sentCount || 0);
-      setFlashMessage(
-        response.data?.message ||
-          `Sent reminder message for ${sentCount} member${sentCount === 1 ? "" : "s"}.`
-      );
+      const nextJob = response.data;
+
+      if (nextJob?.jobId) {
+        setExpiredReminderJob(nextJob);
+        return;
+      }
+
+      setFlashMessage(nextJob?.message || "Expired member reminders finished.");
       closeExpiredReminderModal(true);
       setReloadToken((current) => current + 1);
+      setSendingExpiredReminders(false);
     } catch (requestError) {
       setError(getApiError(requestError, "Unable to send expired member reminders."));
-    } finally {
       setSendingExpiredReminders(false);
     }
   };
@@ -946,7 +987,9 @@ export default function Customers() {
 
             <div className="modal-form">
               <div className="status-banner">
-                Are you sure you want to send the messages for expired members?
+                {sendingExpiredReminders
+                  ? expiredReminderJob?.message || "Preparing expired member reminders..."
+                  : "Are you sure you want to send the messages for expired members?"}
               </div>
 
               <div className="form-actions">
@@ -956,7 +999,11 @@ export default function Customers() {
                   onClick={handleSendExpiredReminders}
                   disabled={sendingExpiredReminders}
                 >
-                  {sendingExpiredReminders ? "Sending..." : "OK, send reminders"}
+                  {sendingExpiredReminders
+                    ? expiredReminderJob?.eligibleCount
+                      ? `${expiredReminderJob.processedCount} / ${expiredReminderJob.eligibleCount}`
+                      : "Sending..."
+                    : "OK, send reminders"}
                 </button>
                 <button
                   className="button button--ghost"

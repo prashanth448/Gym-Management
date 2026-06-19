@@ -1,8 +1,10 @@
 
+const { randomUUID } = require("crypto");
 const router = require("express").Router();
 const auth = require("../middleware/auth");
 const { getStore } = require("../data/store");
 const Customer = require("../models/Customer");
+const Gym = require("../models/Gym");
 const { emitAdminDataChanged, emitGymDataChanged } = require("../realtime");
 const { getTodayDate, parseDateOnly } = require("../utils/date");
 const { getPlanEnd, isValidPlan } = require("../utils/plan");
@@ -13,6 +15,11 @@ const {
   sendWhatsAppMessage,
   toWhatsAppRecipient
 } = require("../utils/whatsappReminders");
+
+const MANUAL_EXPIRED_REMINDER_DAILY_LIMIT = 2;
+const EXPIRED_REMINDER_BATCH_SIZE = 10;
+const EXPIRED_REMINDER_JOB_TTL_MS = 30 * 60 * 1000;
+const expiredReminderJobs = new Map();
 
 function requireOwner(req, res) {
   if (req.user.role !== "owner") {
@@ -187,6 +194,119 @@ function getExpiredReminderCustomerProjection() {
   };
 }
 
+function getActiveExpiredReminderJob(gymId) {
+  return Array.from(expiredReminderJobs.values()).find(
+    (job) => job.gymId === gymId && ["queued", "running"].includes(job.status)
+  );
+}
+
+function buildExpiredReminderJobResponse(job) {
+  return {
+    jobId: job.jobId,
+    status: job.status,
+    eligibleCount: job.eligibleCount,
+    processedCount: job.processedCount,
+    sentCount: job.sentCount,
+    failedCount: job.failedCount,
+    message: job.message
+  };
+}
+
+function scheduleExpiredReminderJobCleanup(jobId) {
+  const cleanupTimer = setTimeout(() => {
+    expiredReminderJobs.delete(jobId);
+  }, EXPIRED_REMINDER_JOB_TTL_MS);
+
+  cleanupTimer.unref?.();
+}
+
+async function processExpiredReminderJob(job) {
+  job.status = "running";
+  job.message = `Sending expired member reminders to ${job.eligibleCount} member${
+    job.eligibleCount === 1 ? "" : "s"
+  }.`;
+
+  for (let index = 0; index < job.customers.length; index += EXPIRED_REMINDER_BATCH_SIZE) {
+    const batch = job.customers.slice(index, index + EXPIRED_REMINDER_BATCH_SIZE);
+
+    await Promise.all(
+      batch.map(async (customer) => {
+        try {
+          const recipient = toWhatsAppRecipient(customer.phone, {
+            defaultCountryCode: process.env.WHATSAPP_DEFAULT_COUNTRY_CODE
+          });
+          const message = buildReminderMessage({
+            customer,
+            gymName: job.gymName,
+            reminderType: "expired"
+          });
+          const templatePayload = buildReminderTemplatePayload({
+            customer,
+            gymName: job.gymName,
+            reminderType: "expired"
+          });
+
+          if (!templatePayload) {
+            throw new Error(
+              "Configure META_WHATSAPP_EXPIRED_TEMPLATE_NAME before sending expired member reminders."
+            );
+          }
+
+          await sendWhatsAppMessage({
+            to: recipient,
+            body: message,
+            templatePayload
+          });
+
+          await Customer.updateOne(
+            {
+              gymId: job.gymId,
+              customerId: customer.customerId
+            },
+            {
+              $set: {
+                lastReminderChannel: "whatsapp",
+                lastReminderType: "expired-manual",
+                lastReminderPlanEnd: customer.planEnd,
+                lastReminderSentOn: job.today
+              }
+            }
+          );
+
+          job.sentCount += 1;
+        } catch (error) {
+          job.failedCount += 1;
+          job.failures.push(`${customer.fullName}: ${error.message}`);
+        } finally {
+          job.processedCount += 1;
+        }
+      })
+    );
+
+    job.message = `Sending expired member reminders: ${job.processedCount} of ${job.eligibleCount} processed.`;
+  }
+
+  if (job.sentCount > 0) {
+    emitGymDataChanged(job.gymId, "expired-reminders-sent");
+  }
+
+  job.status = "completed";
+  job.customers = [];
+
+  const messageParts = [];
+  if (job.sentCount > 0) {
+    messageParts.push(
+      `${job.sentCount} expired member reminder${job.sentCount === 1 ? "" : "s"} sent.`
+    );
+  }
+
+  if (job.failedCount > 0) {
+    messageParts.push(`${job.failedCount} reminder${job.failedCount === 1 ? "" : "s"} failed.`);
+  }
+
+  job.message = messageParts.join(" ") || "No expired member reminders were sent.";
+}
+
 router.get("/", auth, async (req, res) => {
   if (!requireOwner(req, res)) {
     return;
@@ -267,6 +387,49 @@ router.post("/reminders/expired", auth, async (req, res) => {
   const gymName = req.user.gymName || "your gym";
 
   try {
+    const activeJob = getActiveExpiredReminderJob(req.user.gymId);
+
+    if (activeJob) {
+      return res.status(202).json(buildExpiredReminderJobResponse(activeJob));
+    }
+
+    const gym = await Gym.findOne(
+      {
+        gymId: req.user.gymId
+      },
+      {
+        _id: 0,
+        manualExpiredReminderSentOn: 1,
+        manualExpiredReminderSendCount: 1
+      }
+    ).lean();
+    const sendCountToday =
+      gym?.manualExpiredReminderSentOn === today
+        ? Number(gym.manualExpiredReminderSendCount || 0)
+        : 0;
+
+    if (sendCountToday >= MANUAL_EXPIRED_REMINDER_DAILY_LIMIT) {
+      return res.status(429).json({
+        message: `Expired member reminders can be sent only ${MANUAL_EXPIRED_REMINDER_DAILY_LIMIT} times per day. Please try again tomorrow.`
+      });
+    }
+
+    const templatePayload = buildReminderTemplatePayload({
+      customer: {
+        fullName: "Member",
+        planEnd: today
+      },
+      gymName,
+      reminderType: "expired"
+    });
+
+    if (!templatePayload) {
+      return res.status(400).json({
+        message:
+          "Configure META_WHATSAPP_EXPIRED_TEMPLATE_NAME before sending expired member reminders."
+      });
+    }
+
     const expiredCustomers = await Customer.find(
       {
         gymId: req.user.gymId,
@@ -276,90 +439,76 @@ router.post("/reminders/expired", auth, async (req, res) => {
       getExpiredReminderCustomerProjection()
     ).lean();
 
-    let sentCount = 0;
-    let failedCount = 0;
-    const failures = [];
-
-    for (const customer of expiredCustomers) {
-      try {
-        const recipient = toWhatsAppRecipient(customer.phone, {
-          defaultCountryCode: process.env.WHATSAPP_DEFAULT_COUNTRY_CODE
-        });
-        const message = buildReminderMessage({
-          customer,
-          gymName,
-          reminderType: "expired"
-        });
-        const templatePayload = buildReminderTemplatePayload({
-          customer,
-          gymName,
-          reminderType: "expired"
-        });
-
-        if (!templatePayload) {
-          return res.status(400).json({
-            message:
-              "Configure META_WHATSAPP_EXPIRED_TEMPLATE_NAME before sending expired member reminders."
-          });
-        }
-
-        await sendWhatsAppMessage({
-          to: recipient,
-          body: message,
-          templatePayload
-        });
-
-        await Customer.updateOne(
-          {
-            gymId: req.user.gymId,
-            customerId: customer.customerId
-          },
-          {
-            $set: {
-              lastReminderChannel: "whatsapp",
-              lastReminderType: "expired-manual",
-              lastReminderPlanEnd: customer.planEnd,
-              lastReminderSentOn: today
-            }
-          }
-        );
-
-        sentCount += 1;
-      } catch (error) {
-        failedCount += 1;
-        failures.push(`${customer.fullName}: ${error.message}`);
-      }
-    }
-
-    if (sentCount > 0) {
-      emitGymDataChanged(req.user.gymId, "expired-reminders-sent");
-    }
-
-    const messageParts = [];
-
     if (!expiredCustomers.length) {
-      messageParts.push("No expired members found.");
-    } else if (sentCount > 0) {
-      messageParts.push(
-        `${sentCount} expired member reminder${sentCount === 1 ? "" : "s"} sent.`
-      );
+      return res.json({
+        status: "completed",
+        eligibleCount: 0,
+        processedCount: 0,
+        sentCount: 0,
+        failedCount: 0,
+        message: "No expired members found."
+      });
     }
 
-    if (failedCount > 0) {
-      messageParts.push(`${failedCount} reminder${failedCount === 1 ? "" : "s"} failed.`);
-    }
+    await Gym.updateOne(
+      {
+        gymId: req.user.gymId
+      },
+      {
+        $set: {
+          manualExpiredReminderSentOn: today,
+          manualExpiredReminderSendCount: sendCountToday + 1
+        }
+      }
+    );
 
-    res.json({
+    const job = {
+      jobId: randomUUID(),
+      gymId: req.user.gymId,
+      gymName,
+      today,
+      status: "queued",
       eligibleCount: expiredCustomers.length,
-      sentCount,
-      failedCount,
-      failures,
-      message: messageParts.join(" ")
+      processedCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      failures: [],
+      customers: expiredCustomers,
+      message: `Queued expired member reminders for ${expiredCustomers.length} member${
+        expiredCustomers.length === 1 ? "" : "s"
+      }.`
+    };
+
+    expiredReminderJobs.set(job.jobId, job);
+    scheduleExpiredReminderJobCleanup(job.jobId);
+    setImmediate(() => {
+      processExpiredReminderJob(job).catch((error) => {
+        console.error("Unable to process expired member reminder job.", error);
+        job.status = "failed";
+        job.message = "Unable to send expired member reminders.";
+        job.customers = [];
+      });
     });
+
+    res.status(202).json(buildExpiredReminderJobResponse(job));
   } catch (error) {
     console.error("Unable to send expired member reminders.", error);
     res.status(500).json({ message: "Unable to send expired member reminders." });
   }
+});
+
+router.get("/reminders/expired/:jobId", auth, async (req, res) => {
+  if (!requireOwner(req, res)) {
+    return;
+  }
+
+  const job = expiredReminderJobs.get(req.params.jobId);
+
+  if (!job || job.gymId !== req.user.gymId) {
+    return res.status(404).json({ message: "Reminder job not found." });
+  }
+
+  res.json(buildExpiredReminderJobResponse(job));
 });
 
 router.get("/:customerId", auth, async (req, res) => {

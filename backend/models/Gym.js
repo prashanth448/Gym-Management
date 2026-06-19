@@ -13,6 +13,8 @@ const schema = new mongoose.Schema(
     phone: String,
     city: String,
     passwordUpdatedAt: Date,
+    manualExpiredReminderSentOn: { type: String, default: "" },
+    manualExpiredReminderSendCount: { type: Number, default: 0, min: 0 },
     status: {
       type: String,
       enum: ["Active", "Pending", "Suspended"],
